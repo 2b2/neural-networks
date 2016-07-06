@@ -1,0 +1,47 @@
+Some artificial-neural-network implementations for a school project.
+Just for the learning purpose not for productivity.
+I hope this is useful for at least some people who also want to understand
+how artificial-neural-networks work.
+
+
+--------------------------------------------------------------------------
+
+  WARNING
+
+  This project is in a very EARLY state and every interface and
+  functionality can change in one update!
+
+--------------------------------------------------------------------------
+
+
+NOTE:
+Some comments reference the documentation to get a deeper insight on
+formulas and for a general overview but it could take a while until I
+finish the documentation for the project (at least a few weeks).
+
+
+Current functionality:
+
+	Core (de.ef.neuralnetworks):
+	-common interfaces which all future implementations will implement
+	-some utils for training and async neural-network execution
+	-some IO-utils to map a neural-network to a representing byte-array
+	-some utils for image processing
+
+	SlowWave (de.ef.slowwave):
+	-a (quite slow) working implementation of the core interfaces
+
+
+Planned functionality, Todo:
+	
+	General:
+	-comment some parts that aren't
+	-change normal comments to javadoc
+	-write documentation
+	
+	FastFlood (de.ef.fastflood):
+	-native implementation of the core using OpenCL and/or possible CUDA
+	
+	Examples (de.ef.neuralnetworks.examples):
+	-digit recognition ('0' - '9'),
+		nearly finished added in the near future
