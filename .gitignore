@@ -1,5 +1,7 @@
 # Compiled Classes
 bin/
+build/
+classes/
 *.class
 
 # Package Files
