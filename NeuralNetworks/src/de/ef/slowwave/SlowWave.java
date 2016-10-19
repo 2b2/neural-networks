@@ -1,17 +1,17 @@
 package de.ef.slowwave;
 
 import de.ef.neuralnetworks.NeuralNetwork;
-import de.ef.neuralnetworks.NeuralNetworkConstructor;
+import de.ef.neuralnetworks.NeuralNetworkFactory;
 
 // neural network core class, implements the NeuralNetworkAPI
-// version: 1.5, date: 14.06.2016, author: Erik Fritzsche
+// version: 1.5.1, date: 19.10.2016, author: Erik Fritzsche
 // 
 // for details on all mathematical formulas, equations and
 // a general overview please look into the documentation
 public class SlowWave
 	implements NeuralNetwork{
 	
-	public final static NeuralNetworkConstructor CONSTRUCTOR = (i, h, o) -> new SlowWave(i, h, o);
+	public final static NeuralNetworkFactory FACTORY = (i, h, o) -> new SlowWave(i, h, o);
 	
 	public final static double DEFAULT_LEARNING_RATE = 1;
 	

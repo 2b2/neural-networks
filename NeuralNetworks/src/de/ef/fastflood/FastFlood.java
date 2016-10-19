@@ -2,15 +2,15 @@ package de.ef.fastflood;
 
 import de.ef.fastflood.opencl.OpenCLDevices;
 import de.ef.neuralnetworks.NeuralNetwork;
-import de.ef.neuralnetworks.NeuralNetworkConstructor;
+import de.ef.neuralnetworks.NeuralNetworkFactory;
 
 // TODO comment
 // neural network core class, implements the NeuralNetworkAPI
-// version: 1.2, date: 16.06.2016, author: Erik Fritzsche
+// version: 1.2.1, date: 16.06.2016, author: Erik Fritzsche
 public abstract class FastFlood
 	implements NeuralNetwork, AutoCloseable{
 	
-	public final static NeuralNetworkConstructor OPEN_CL[] = OpenCLDevices.CONSTRUCTORS;
+	public final static NeuralNetworkFactory OPEN_CL[] = OpenCLDevices.DEVICES;
 	
 	public final static double DEFAULT_LEARNING_RATE = 1;
 	

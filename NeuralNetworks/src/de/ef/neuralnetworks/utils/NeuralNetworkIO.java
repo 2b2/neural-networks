@@ -8,7 +8,7 @@ import java.io.OutputStream;
 import java.util.Arrays;
 
 import de.ef.neuralnetworks.NeuralNetwork;
-import de.ef.neuralnetworks.NeuralNetworkConstructor;
+import de.ef.neuralnetworks.NeuralNetworkFactory;
 
 // TODO comment
 // version: 1.1, date: 07.06.2016, author: Erik Fritzsche
@@ -19,7 +19,7 @@ public final class NeuralNetworkIO{
 	
 	
 	public static void write(NeuralNetwork network, OutputStream output) throws IOException{
-		write(network, true, output);
+		NeuralNetworkIO.write(network, true, output);
 	}
 	
 	public static void write(NeuralNetwork network, boolean doublePrecision, OutputStream output) throws IOException{
@@ -59,7 +59,7 @@ public final class NeuralNetworkIO{
 		dataOutput.flush();
 	}
 	
-	public static NeuralNetwork read(NeuralNetworkConstructor constructor, InputStream input) throws IOException{
+	public static NeuralNetwork read(NeuralNetworkFactory factory, InputStream input) throws IOException{
 		DataInputStream dataInput = new DataInputStream(input);
 		
 		byte init = dataInput.readByte();
@@ -72,7 +72,7 @@ public final class NeuralNetworkIO{
 			layerSizes[layer] = dataInput.readInt();
 		}
 		
-		NeuralNetwork network = constructor.createNeuralNetwork(
+		NeuralNetwork network = factory.createNeuralNetwork(
 			layerSizes[0],
 			Arrays.copyOfRange(layerSizes, 1, layerSizes.length - 1),
 			layerSizes[layerSizes.length - 1]
