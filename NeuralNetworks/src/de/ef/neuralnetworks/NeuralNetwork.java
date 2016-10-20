@@ -1,6 +1,7 @@
 package de.ef.neuralnetworks;
 
 import java.io.IOException;
+import java.io.Serializable;
 
 /**
  * The interface {@code NeuralNetwork}  is the core of this API.<br>
@@ -14,7 +15,8 @@ import java.io.IOException;
  * @version 1.0
  * @since 1.0
  */
-public interface NeuralNetwork{
+public interface NeuralNetwork
+	extends Serializable{
 	
 	/**
 	 * Calculates an output state based on the given input state.

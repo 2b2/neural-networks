@@ -1,5 +1,9 @@
 package de.ef.slowwave;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
 import de.ef.neuralnetworks.NeuralNetwork;
 
 /**
@@ -20,6 +24,12 @@ public class SlowWave
 	implements NeuralNetwork{
 	
 	/**
+	 * Make always same as @version in JavaDoc in format xxxx.yyyy.zzzz
+	 */
+	private static final long serialVersionUID = 0001_0000_0000L;
+	
+	
+	/**
 	 * The default learning rate for the used backpropagation training algorithm.
 	 */
 	public final static double DEFAULT_LEARNING_RATE = 1.0;
@@ -27,7 +37,6 @@ public class SlowWave
 	
 	
 	private final Neuron layers[][];
-	private final int layerCount;
 	
 	
 	/**
@@ -39,8 +48,7 @@ public class SlowWave
 	 * @param outputSize size of the last layer
 	 */
 	public SlowWave(int inputSize, int hiddenSizes[], int outputSize){
-		this.layerCount = 2 + hiddenSizes.length;
-		this.layers = new Neuron[this.layerCount][];
+		this.layers = new Neuron[2 + hiddenSizes.length][];
 		
 		// create the input layer
 		this.layers[0] = new Neuron[inputSize];
@@ -49,9 +57,9 @@ public class SlowWave
 			this.layers[i + 1] = new Neuron[hiddenSizes[i]];
 		}
 		// create output layer
-		this.layers[this.layerCount - 1] = new Neuron[outputSize];
+		this.layers[this.layers.length - 1] = new Neuron[outputSize];
 		// init the neuron layers (except the input layer)
-		for(int i = 1; i < this.layerCount; i++){
+		for(int i = 1; i < this.layers.length; i++){
 			// init each neuron
 			for(int j = 0; j < this.layers[i].length; j++){
 				// init all weights including bias neuron
@@ -78,7 +86,7 @@ public class SlowWave
 			this.layers[0][i].setOutput(inputs[i]);
 		}
 		// run through each layer (except input)
-		for(int i = 1; i < this.layerCount; i++){
+		for(int i = 1; i < this.layers.length; i++){
 			// run through each neuron in current layer
 			for(int j = 0; j < this.layers[i].length; j++){
 				// calculate input sum for neuron
@@ -97,9 +105,9 @@ public class SlowWave
 		}
 		// grab and return outputs from last layer
 		double outputs[] =
-			new double[this.layers[this.layerCount - 1].length];
+			new double[this.layers[this.layers.length - 1].length];
 		for(int i = 0; i < outputs.length; i++){
-			outputs[i] = this.layers[this.layerCount - 1][i].getOutput();
+			outputs[i] = this.layers[this.layers.length - 1][i].getOutput();
 		}
 		return outputs;
 	}
@@ -116,14 +124,14 @@ public class SlowWave
 		// update neural network to get current output
 		this.calculate(inputs);
 		// run through each layer (except input), reversed order
-		for(int i = this.layerCount - 1; i > 0; i--){
+		for(int i = this.layers.length - 1; i > 0; i--){
 			// run through each neuron in current layer and calculate error
 			for(int j = 0; j < this.layers[i].length; j++){
 				double lastError = 0;
 				// if the current layer is the output layer
 				// then the last error is the expected output
 				// minus the real output of the current neuron
-				if(i == this.layerCount - 1){
+				if(i == this.layers.length - 1){
 					lastError = outputs[j] - this.layers[i][j].getOutput();
 				}
 				// if not then calculate the last error form
@@ -161,10 +169,27 @@ public class SlowWave
 		}
 		// calculate and return total error
 		double totalError = 0;
-		for(Neuron output : this.layers[this.layerCount - 1]){
+		for(Neuron output : this.layers[this.layers.length - 1]){
 			totalError += Math.abs(output.getError());
 		}
 		return totalError;
+	}
+	
+	
+	// serialization
+	private void writeObject(ObjectOutputStream output) throws IOException{
+		SlowWaveSerialization.write(this, output);
+	}
+	
+	private void readObject(ObjectInputStream input) throws IOException{
+		// TODO reflect/unsafe set final field
+		this.layers = SlowWaveSerialization.readLayers(input);
+		SlowWaveSerialization.read(this, input);
+	}
+	
+	
+	Neuron[][] getLayers(){
+		return this.layers;
 	}
 	
 	
@@ -179,39 +204,39 @@ public class SlowWave
 	 * @version 1.0
 	 * @since 1.0
 	 */
-	private class Neuron{
+	class Neuron{
 		
 		private double output, error, weights[];
 		
 		
-		public Neuron(double[] weights){
+		Neuron(double[] weights){
 			this.weights = weights;
 		}
 		
 		
-		public void setOutput(double value){
+		void setOutput(double value){
 			this.output = value;
 		}
 		
-		public double getOutput(){
+		double getOutput(){
 			return this.output;
 		}
 		
 		
-		public void setError(double value){
+		void setError(double value){
 			this.error = value;
 		}
 		
-		public double getError(){
+		double getError(){
 			return this.error;
 		}
 		
 		
-		public void setWeight(int index, double value){
+		void setWeight(int index, double value){
 			this.weights[index] = value;
 		}
 		
-		public double getWeight(int index){
+		double getWeight(int index){
 			return weights[index];
 		}
 	}
