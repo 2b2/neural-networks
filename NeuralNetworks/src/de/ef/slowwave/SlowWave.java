@@ -1,19 +1,28 @@
 package de.ef.slowwave;
 
 import de.ef.neuralnetworks.NeuralNetwork;
-import de.ef.neuralnetworks.NeuralNetworkFactory;
 
-// neural network core class, implements the NeuralNetworkAPI
-// version: 1.5.1, date: 19.10.2016, author: Erik Fritzsche
-// 
-// for details on all mathematical formulas, equations and
-// a general overview please look into the documentation
+/**
+ * {@code SlowWave} is a simple single-threaded implementation of a
+ * {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetwork}.
+ * <p>
+ * In this implementation every neuron of a layer (the first layer excluded)
+ * is connected with every neuron from the previous layer. Every connection
+ * has some weight to it and the backpropagation algorithm used changes
+ * this weight to train and adjust the network.
+ * </p>
+ * 
+ * @author Erik Fritzsche
+ * @version 1.0
+ * @since 1.0
+ */
 public class SlowWave
 	implements NeuralNetwork{
 	
-	public final static NeuralNetworkFactory FACTORY = (i, h, o) -> new SlowWave(i, h, o);
-	
-	public final static double DEFAULT_LEARNING_RATE = 1;
+	/**
+	 * The default learning rate for the used backpropagation training algorithm.
+	 */
+	public final static double DEFAULT_LEARNING_RATE = 1.0;
 	
 	
 	
@@ -21,6 +30,14 @@ public class SlowWave
 	private final int layerCount;
 	
 	
+	/**
+	 * Constructs a neural-network with {@code hiddenSizes.length + 2} layers.
+	 * The size of each layer is defined by the according parameter.
+	 * 
+	 * @param inputSize size of first layer
+	 * @param hiddenSizes sizes of the the layers between the first and the last
+	 * @param outputSize size of the last layer
+	 */
 	public SlowWave(int inputSize, int hiddenSizes[], int outputSize){
 		this.layerCount = 2 + hiddenSizes.length;
 		this.layers = new Neuron[this.layerCount][];
@@ -54,7 +71,6 @@ public class SlowWave
 	}
 	
 	
-	// calculate the output of the neural network for the given input
 	@Override
 	public double[] calculate(double inputs[]){
 		// set input neurons
@@ -89,20 +105,17 @@ public class SlowWave
 	}
 	
 	
-	// just calls train with default learning rate
+	// just call train with default learning rate
 	@Override
 	public double train(double inputs[], double outputs[]){
 		return this.train(inputs, outputs, DEFAULT_LEARNING_RATE);
 	}
 	
-	// lets the neural network adjust itself (aka training)
-	// by using backpropagation and returns the total
-	// network error (before adjustments are made)
 	@Override
 	public double train(double inputs[], double outputs[], double learningRate){
-		// updates neural network to get current output
+		// update neural network to get current output
 		this.calculate(inputs);
-		// run through each layer (except input), reverse order
+		// run through each layer (except input), reversed order
 		for(int i = this.layerCount - 1; i > 0; i--){
 			// run through each neuron in current layer and calculate error
 			for(int j = 0; j < this.layers[i].length; j++){
@@ -155,32 +168,17 @@ public class SlowWave
 	}
 	
 	
-	// TODO comment
-	public boolean hasBias(){
-		return true;
-	}
 	
-	public int getLayerCount(){
-		return this.layerCount;
-	}
-	
-	public int getNeuronCount(int layer){
-		return this.layers[layer].length;
-	}
-	
-	public double getWeight(int layer, int neuron, int weight){
-		return this.layers[layer][neuron].getWeight(weight);
-	}
-	
-	public void setWeight(int layer, int neuron, int weight, double value){
-		this.layers[layer][neuron].setWeight(weight, value);
-	}
-	
-	
-	
-	// neuron class, basically a container for an output value,
-	// an error value and the weights of the connections to the
-	// previous layer and according getter and setter methods
+	/**
+	 * The class {@code Neuron} is basically a container for
+	 * an output value, an error value and the weights of the
+	 * connections to the previous layer with according
+	 * getter and setter methods.
+	 * 
+	 * @author Erik Fritzsche
+	 * @version 1.0
+	 * @since 1.0
+	 */
 	private class Neuron{
 		
 		private double output, error, weights[];

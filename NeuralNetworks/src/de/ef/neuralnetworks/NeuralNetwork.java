@@ -1,35 +1,79 @@
 package de.ef.neuralnetworks;
 
-// the core class of all implementations of this API
-// the implementation may or may not be thread-safe
-// version: 1.1, date: 06.06.2016, author: Erik Fritzsche
+import java.io.IOException;
+
+/**
+ * The interface {@code NeuralNetwork}  is the core of this API.<br>
+ * A neural-network is formed from layers of neurons,
+ * how these neurons are connected together is up to the implementation.
+ * <p>
+ * <b>Important:</b> A implementation does <b>not</b> necessary need to be <b>thread-safe</b>.
+ * </p>
+ * 
+ * @author Erik Fritzsche
+ * @version 1.0
+ * @since 1.0
+ */
 public interface NeuralNetwork{
 	
-	// runs the neural network with the given inputs
-	// and returns the values of the output layer
-	public double[] calculate(double inputs[]);
-	
-	// adjusts the network based on the given input set and the expected outputs
-	// the implementation of the training algorithm is up to the network
-	// the total network output error is returned (before adjustment)
-	// the network could be locked while training but this depends on the implementation
-	public double train(double inputs[], double outputs[]);
-	
-	// see the training function with two arguments for more details
-	// this function adjusts the learning rate if the underlying implementation
-	// supports that (like the often used backpropagation)
-	// if not the learningRate argument should have no effect
-	public double train(double inputs[], double outputs[], double learningRate);
+	/**
+	 * Calculates an output state based on the given input state.
+	 * 
+	 * @param inputs the states of the neurons inside the first layer
+	 * 
+	 * @return the output states of the neurons inside the last layer
+	 * 
+	 * @throws IOException if the underlying implementation experienced an error
+	 * @throws NullPointerException if {@code inputs == null}
+	 * @throws ArrayIndexOutOfBoundsException if {@code inputs.length} is smaller then the size of the first layer
+	 */
+	public double[] calculate(double inputs[]) throws IOException;
 	
 	
-	// TODO comment
-	public boolean hasBias();
+	/**
+	 * Changes the neural-network internally so that the output of {@link #calculate(double[]) calculate}
+	 * called with {@code inputs} after a call to this function matches the expected {@code outputs}
+	 * closer than before.
+	 * <p>
+	 * <i>Note:</i> In some cases with some implementations this function may change nothing
+	 * or make the difference even bigger.
+	 * </p>
+	 * 
+	 * @param inputs the states of the neurons inside the first layer
+	 * @param outputs the expected states of the neurons inside the last layer
+	 * 
+	 * @return the total error of the neural-network before adjustments
+	 * 
+	 * @throws IOException if the underlying implementation experienced an error
+	 * @throws NullPointerException if {@code inputs == null} or {@code outputs == null}
+	 * @throws ArrayIndexOutOfBoundsException if {@code inputs.length} is smaller then the size of the first layer
+	 * or {@code outputs.length} is smaller then the size of the last layer
+	 */
+	public double train(double inputs[], double outputs[]) throws IOException;
 	
-	public int getLayerCount();
-	
-	public int getNeuronCount(int layer);
-	
-	public double getWeight(int layer, int neuron, int weight);
-	
-	public void setWeight(int layer, int neuron, int weight, double value);
+	/**
+	 * This function adds control over the learning rate to the
+	 * {@link #train(double[], double[]) training} function.
+	 * <p>
+	 * Some training algorithm like the popular backpropagation support a learning rate
+	 * which tunes how drastic the internal changes are on each adjustment.
+	 * </p>
+	 * <p>
+	 * <i>Note:</i> If a learning rate is not supported by the underlying training algorithm
+	 * then this function <u>must</u> do exactly the same as {@link #train(double[], double[])}
+	 * and ignore the {@code learningRate}.
+	 * </p>
+	 * 
+	 * @param inputs the states of the neurons inside the first layer
+	 * @param outputs the expected states of the neurons inside the last layer
+	 * @param learningRate a fine-tuning parameter for the training algorithm
+	 * 
+	 * @return the total error of the neural-network before adjustments
+	 * 
+	 * @throws IOException if the underlying implementation experienced an error
+	 * @throws NullPointerException if {@code inputs == null} or {@code outputs == null}
+	 * @throws ArrayIndexOutOfBoundsException if {@code inputs.length} is smaller then the size of the first layer
+	 * or {@code outputs.length} is smaller then the size of the last layer
+	 */
+	public double train(double inputs[], double outputs[], double learningRate) throws IOException;
 }
