@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.io.Serializable;
 
 /**
- * The interface {@code NeuralNetwork}  is the core of this API.<br>
+ * The interface {@code NeuralNetwork} is the core of this API.<br>
  * A neural-network is formed from layers of neurons,
  * how these neurons are connected together is up to the implementation.
  * <p>
