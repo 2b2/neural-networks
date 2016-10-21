@@ -182,8 +182,6 @@ public class SlowWave
 	}
 	
 	private void readObject(ObjectInputStream input) throws IOException{
-		// TODO reflect/unsafe set final field
-		this.layers = SlowWaveSerialization.readLayers(input);
 		SlowWaveSerialization.read(this, input);
 	}
 	
@@ -209,7 +207,7 @@ public class SlowWave
 		private double output, error, weights[];
 		
 		
-		Neuron(double[] weights){
+		Neuron(double weights[]){
 			this.weights = weights;
 		}
 		
