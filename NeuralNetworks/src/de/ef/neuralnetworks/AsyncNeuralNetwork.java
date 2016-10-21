@@ -33,6 +33,7 @@ public class AsyncNeuralNetwork{
 	private final BlockingQueue<AsyncDataContainer> queue;
 	private final ExecutorService producer;
 	
+	
 	/**
 	 * Configures the {@code AsyncNeuralNetworks} to have
 	 * one neural-network and one producer thread.
@@ -67,7 +68,7 @@ public class AsyncNeuralNetwork{
 	 * {@code networks.length} producer threads.
 	 * 
 	 * @param networks the asynchronously accessed
-	 * {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetwork}
+	 * {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetworks}
 	 */
 	public AsyncNeuralNetwork(NeuralNetwork[] networks){
 		this(networks, networks.length);
