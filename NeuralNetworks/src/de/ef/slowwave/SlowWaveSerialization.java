@@ -5,6 +5,15 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
 
+/**
+ * {@code SlowWaveSerialization} is a helper class for
+ * {@link de.ef.slowwave.SlowWave SlowWave} to serialize
+ * and deserialize it.
+ * 
+ * @author Erik Fritzsche
+ * @version 1.0
+ * @since 1.0
+ */
 class SlowWaveSerialization{
 	
 	private SlowWaveSerialization(){}
