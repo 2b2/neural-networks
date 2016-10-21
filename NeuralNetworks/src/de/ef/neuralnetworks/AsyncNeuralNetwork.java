@@ -10,7 +10,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.stream.DoubleStream;
 
 /**
- * The class {@code AsyncNeuralNetworks} makes a
+ * The class {@code AsyncNeuralNetwork} makes a
  * {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetwork}
  * asynchronously accessible.
  * <p>
