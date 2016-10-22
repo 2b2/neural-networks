@@ -24,9 +24,9 @@ public class SlowWave
 	implements NeuralNetwork{
 	
 	/**
-	 * Make always same as @version in JavaDoc in format xxxx.yyyy.zzzz
+	 * Make always same as @version in JavaDoc in format xxx.yyy.zzz
 	 */
-	private final static long serialVersionUID = 0001_0000_0000L;
+	private final static long serialVersionUID = 001_000_000L;
 	
 	
 	/**
