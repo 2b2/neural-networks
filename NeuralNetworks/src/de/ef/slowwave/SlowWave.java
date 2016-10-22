@@ -26,7 +26,7 @@ public class SlowWave
 	/**
 	 * Make always same as @version in JavaDoc in format xxxx.yyyy.zzzz
 	 */
-	private static final long serialVersionUID = 0001_0000_0000L;
+	private final static long serialVersionUID = 0001_0000_0000L;
 	
 	
 	/**
