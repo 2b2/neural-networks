@@ -21,14 +21,19 @@ public class FastFloodOpenCL
 	extends FastFlood{
 	
 	/**
-	 * Make always same as @version in JavaDoc in format xxxx.yyyy.zzzz
+	 * Make always same as @version in JavaDoc in format xxx.yyy.zzz
 	 */
-	private static final long serialVersionUID = 0001_0000_0000L;
+	private final static long serialVersionUID = 001_000_000L;
+	
+	private final static int
+		NEURON_COUNTS_INDEX = 4, NEURON_OFFSETS_INDEX = 3,
+		INPUTS_INDEX = 2, OUTPUTS_INDEX = 1, WEIGHTS_INDEX = 0;
 	
 	
 	
 	private final cl_context context;
 	private final cl_device_id device;
+	private final Pointer pointers[];
 	private final cl_mem memory[];
 	private final cl_program program;
 	private final cl_kernel kernel;
@@ -40,49 +45,56 @@ public class FastFloodOpenCL
 		this.context = context;
 		this.device = device;
 		
+		this.pointers = new Pointer[3];
+		this.pointers[INPUTS_INDEX] = Pointer.to(this.inputs);
+		this.pointers[OUTPUTS_INDEX] = Pointer.to(this.outputs);
+		this.pointers[WEIGHTS_INDEX] = Pointer.to(this.weights);
+		
 		this.memory = new cl_mem[5];
-		this.memory[0] = clCreateBuffer(
+		this.memory[NEURON_COUNTS_INDEX] = clCreateBuffer(
 			context,
 			CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
 			Sizeof.cl_int * this.neuronCounts.length,
 			Pointer.to(this.neuronCounts),
 			null
 		);
-		this.memory[1] = clCreateBuffer(
-			context,
-			CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-			Sizeof.cl_int * this.layerOffsets.length,
-			Pointer.to(this.layerOffsets),
-			null
-		);
-		this.memory[2] = clCreateBuffer(
+		this.memory[NEURON_OFFSETS_INDEX] = clCreateBuffer(
 			context,
 			CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
 			Sizeof.cl_int * this.neuronOffsets.length,
 			Pointer.to(this.neuronOffsets),
 			null
 		);
-		this.memory[3] = clCreateBuffer(
+		this.memory[INPUTS_INDEX] = clCreateBuffer(
 			context,
-			CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, // or CL_MEM_USE_HOST_PTR or nothing
-			Sizeof.cl_float * this.neurons.length,
-			Pointer.to(this.neurons),
+			CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+			Sizeof.cl_float * this.inputs.length,
+			this.pointers[INPUTS_INDEX],
 			null
 		);
-		this.memory[4] = clCreateBuffer(
+		this.memory[OUTPUTS_INDEX] = clCreateBuffer(
+			context,
+			CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, // or CL_MEM_USE_HOST_PTR or nothing
+			Sizeof.cl_float * this.outputs.length,
+			this.pointers[OUTPUTS_INDEX],
+			null
+		);
+		this.memory[WEIGHTS_INDEX] = clCreateBuffer(
 			context,
 			CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, // or CL_MEM_USE_HOST_PTR or nothing
 			Sizeof.cl_float * this.weights.length,
-			Pointer.to(this.weights),
+			this.pointers[WEIGHTS_INDEX],
 			null
 		);
+		
 		
 		this.program = clCreateProgramWithSource(context, 1, new String[]{/* TODO kernel source */}, null, null);
 		clBuildProgram(this.program, 0, null, null, null, null);
 		
 		this.kernel = clCreateKernel(program, "TODO", null);
+		// set kernel arguments, reverse order
 		for(int i = 0; i < this.memory.length; i++){
-			clSetKernelArg(this.kernel, i, Sizeof.cl_mem, Pointer.to(this.memory[i]));
+			clSetKernelArg(this.kernel, i, Sizeof.cl_mem, Pointer.to(this.memory[this.memory.length - (i + 1)]));
 		}
 	}
 	
@@ -94,35 +106,35 @@ public class FastFloodOpenCL
 	
 	
 	@Override
-	protected void sync() throws IOException{
-		// TODO sync resources
+	protected void writeInputs() throws IOException{
+		clEnqueueWriteBuffer(
+			/* TODO queue */null,
+			this.memory[INPUTS_INDEX],
+			CL_TRUE,
+			0,
+			this.outputs.length * Sizeof.cl_float,
+			this.pointers[INPUTS_INDEX],
+			0,
+			null,
+			null
+		);
 	}
 	
 	@Override
-	protected void read() throws IOException{
+	protected void readOutputs() throws IOException{
 		clEnqueueReadBuffer(
 			/* TODO queue */null,
-			this.memory[3],
+			this.memory[OUTPUTS_INDEX],
 			CL_TRUE,
 			0,
-			this.neurons.length * Sizeof.cl_float,
-			/* TODO destination pointer*/null,
-			0,
-			null,
-			null
-		);
-		clEnqueueReadBuffer(
-			/* TODO queue */null,
-			this.memory[4],
-			CL_TRUE,
-			0,
-			this.weights.length * Sizeof.cl_float,
-			/* TODO destination pointer*/null,
+			this.outputs.length * Sizeof.cl_float,
+			this.pointers[OUTPUTS_INDEX],
 			0,
 			null,
 			null
 		);
 	}
+	
 	
 	@Override
 	public void close() throws IOException{
