@@ -1,67 +1,68 @@
 package de.ef.fastflood;
 
-import de.ef.fastflood.opencl.OpenCLDevices;
-import de.ef.neuralnetworks.NeuralNetwork;
-import de.ef.neuralnetworks.NeuralNetworkFactory;
+import java.io.IOException;
 
-// TODO comment
-// neural network core class, implements the NeuralNetworkAPI
-// version: 1.2.1, date: 16.06.2016, author: Erik Fritzsche
+import de.ef.neuralnetworks.NeuralNetwork;
+
+// TODO comment/document
 public abstract class FastFlood
 	implements NeuralNetwork, AutoCloseable{
+
+	/**
+	 * Make always same as @version in JavaDoc in format xxxx.yyyy.zzzz
+	 */
+	private static final long serialVersionUID = 0001_0000_0000L;
 	
-	public final static NeuralNetworkFactory OPEN_CL[] = OpenCLDevices.DEVICES;
 	
-	public final static double DEFAULT_LEARNING_RATE = 1;
+	/**
+	 * The default learning rate for the used backpropagation training algorithm.
+	 */
+	public final static double DEFAULT_LEARNING_RATE = 1.0;
 	
 	
 	
-	protected final int layerCount, inputCount, neuronCounts[], layerOffsets[], neuronOffsets[];
-	protected final float inputs[], neurons[], weights[];
+	protected final int neuronCounts[], layerOffsets[], neuronOffsets[];
+	protected final float neurons[], weights[];
 	
 	
 	protected FastFlood(int inputSize, int hiddenSizes[], int outputSize){
-		this.layerCount = 2 + hiddenSizes.length;
-		this.inputCount = inputSize;
-		this.neuronCounts = new int[this.layerCount - 1];
-		this.layerOffsets = new int[this.layerCount - 1];
+		this.neuronCounts = new int[2 + hiddenSizes.length];
+		this.layerOffsets = new int[2 + hiddenSizes.length];
 		
-		int currentLayerOffset = 0, totalWeightCount = 0;
-		int lastLayerSize = this.inputCount;
+		int lastNeuronCount = inputSize;
+		int totalNeuronCount = inputSize, totalWeightCount = 0;
 		
-		for(int i = 0; i < hiddenSizes.length; i++){
+		this.neuronCounts[0] = inputSize;
+		this.layerOffsets[0] = 0;
+		for(int i = 1; i < hiddenSizes.length; i++){
 			this.neuronCounts[i] = hiddenSizes[i];
-			this.layerOffsets[i] = currentLayerOffset;
-			currentLayerOffset += hiddenSizes[i];
+			this.layerOffsets[i] = totalNeuronCount;
+			totalNeuronCount += hiddenSizes[i];
 			// plus one for bias neuron
-			totalWeightCount += hiddenSizes[i] * (lastLayerSize + 1);
-			lastLayerSize = hiddenSizes[i];
+			totalWeightCount += hiddenSizes[i] * (lastNeuronCount + 1);
+			lastNeuronCount = hiddenSizes[i];
 		}
-		this.neuronCounts[this.layerCount - 2] = outputSize;
-		this.layerOffsets[this.layerCount - 2] = currentLayerOffset;
-		totalWeightCount += outputSize * (lastLayerSize + 1);
+		this.neuronCounts[this.neuronCounts.length - 1] = outputSize;
+		this.layerOffsets[this.neuronCounts.length - 1] = totalNeuronCount;
+		totalNeuronCount += outputSize;
+		totalWeightCount += outputSize * (lastNeuronCount + 1);
 		
-		this.inputs = new float[this.inputCount];
-		this.neurons = new float[currentLayerOffset + outputSize];
+		// init the neurons and weights arrays
+		this.neurons = new float[totalNeuronCount];
 		this.weights = new float[totalWeightCount];
 		
-		// now init the neuron-offsets
+		// now init the neuron offsets
 		this.neuronOffsets = new int[this.neurons.length];
-		
-		// reset last layer
-		lastLayerSize = this.inputCount;
 		
 		// first off set is zero
 		this.neuronOffsets[0] = 0;
-		// loop through each neuron (but not the inputs)
-		for(int i = 1, index = 0, layer = 0; i < this.neurons.length; i++, index++){
+		// loop through each neuron, skip input layer because every neuron has zero weights
+		for(int i = 1, index = 0, layer = 1; i < this.neurons.length; i++, index++){
 			// neuron offset is last offset plus last layer length plus one for the bias weight
-			this.neuronOffsets[i] = this.neuronOffsets[i - 1] + lastLayerSize + 1;
-			// change the last layer size when the end off the current layer is reached
-			if(index == this.neuronCounts[layer]){
-				lastLayerSize = this.neuronCounts[layer];
-				index = 0;
+			this.neuronOffsets[i] = this.neuronOffsets[i - 1] + neuronCounts[layer - 1] + 1;
+			if(index == neuronCounts[layer]){
 				layer++;
+				index = 0;
 			}
 		}
 		
@@ -69,84 +70,47 @@ public abstract class FastFlood
 			// (1 - (Math.random() * 2)) element [-1; 1[
 			this.weights[i] = (float)(1 - (Math.random() * 2));
 		}
-		
-		this.loadStaticResources();
 	}
 	
 	
-	// TODO arraycopy will not work -> for loop
-	// calculate the output of the neural network for the given input
 	@Override
-	public double[] calculate(double inputs[]) throws RuntimeException{
-		this.loadResources();
-		System.arraycopy(inputs, 0, this.inputs, 0, this.inputs.length);
-		for(int i = 1; i < this.layerCount; i++){
+	public double[] calculate(double inputs[]) throws IOException{
+		for(int i = 0; i < this.neuronCounts[0]; i++){
+			this.neurons[i] = (float)inputs[i];
+		}
+		
+		this.sync();
+		for(int i = 1; i < this.neuronCounts.length; i++){
 			this.calculateLayer(i);
 		}
-		this.syncResources();
-		double[] outputs = new double[this.neuronCounts[this.layerCount - 2]];
-		System.arraycopy(this.neurons, this.layerOffsets[this.layerCount - 2], outputs, 0, outputs.length);
-		this.releaseResources();
+		this.read();
+		
+		double[] outputs = new double[this.neuronCounts[this.neuronCounts.length - 1]];
+		int outputOffset = this.neuronOffsets[this.neuronCounts.length - 1];
+		for(int i = 0; i < outputs.length; i++){
+			outputs[i] = this.neurons[outputOffset + i];
+		}
 		
 		return outputs;
 	}
 	
+	protected abstract void calculateLayer(int layer) throws IOException;
 	
-	// just calls train with default learning rate
+	
+	// just call train with default learning rate
 	@Override
-	public double train(double inputs[], double outputs[]){
+	public double train(double inputs[], double outputs[]) throws IOException{
 		return this.train(inputs, outputs, DEFAULT_LEARNING_RATE);
 	}
 	
-	// lets the neural network adjust itself (aka training)
-	// by using backpropagation and returns the total
-	// network error (before adjustments are made)
 	@Override
-	public double train(double inputs[], double outputs[], double learningRate){
-		// TODO
+	public double train(double inputs[], double outputs[], double learningRate) throws IOException{
+		// TODO train fast-flood
 		return 0;
 	}
 	
 	
-	public void close() throws RuntimeException{
-		this.releaseStaticResources();
-	}
+	protected abstract void sync() throws IOException;
 	
-	
-	protected abstract void calculateLayer(int layer) throws RuntimeException;
-	
-	
-	protected abstract void loadResources() throws RuntimeException;
-	
-	protected abstract void releaseResources() throws RuntimeException;
-	
-	protected abstract void syncResources() throws RuntimeException;
-	
-	protected abstract void loadStaticResources() throws RuntimeException;
-	
-	protected abstract void releaseStaticResources() throws RuntimeException;
-	
-	
-	public boolean hasBias(){
-		return true;
-	}
-	
-	public int getLayerCount(){
-		return this.layerCount;
-	}
-	
-	public int getNeuronCount(int layer){
-		// input layer is an exception
-		return layer == 0 ? this.inputCount : this.neuronCounts[layer - 1];
-	}
-	
-	public double getWeight(int layer, int neuron, int weight){
-		// input layer has no weights -> no special treatment
-		return (double)this.weights[this.neuronOffsets[this.layerOffsets[layer] + neuron] + weight];
-	}
-	
-	public void setWeight(int layer, int neuron, int weight, double value){
-		// input layer has no weights -> no special treatment
-		this.weights[this.neuronOffsets[this.layerOffsets[layer] + neuron] + weight] = (float)value;
-	}
+	protected abstract void read() throws IOException;
 }
