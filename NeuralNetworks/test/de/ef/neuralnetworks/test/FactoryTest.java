@@ -17,9 +17,7 @@ public class FactoryTest{
 		
 		NeuralNetwork network = NeuralNetworkFactory.create(config);
 		
-		if(network == null){
-			// LANGUAGE is or was?
+		if(network == null)
 			Assert.fail("The returned network is null.");
-		}
 	}
 }
