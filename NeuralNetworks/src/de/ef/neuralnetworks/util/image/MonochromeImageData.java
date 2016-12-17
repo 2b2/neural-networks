@@ -25,6 +25,13 @@ import de.ef.neuralnetworks.NeuralNetworkData;
 public class MonochromeImageData
 	implements NeuralNetworkData{
 	
+	/**
+	 * Make always same as @version in JavaDoc in format xxx.yyy.zzz
+	 */
+	private final static long serialVersionUID = 002_000_000L;
+	
+	
+	
 	private final int width, height;
 	private final double[] inputs;
 	
@@ -88,10 +95,9 @@ public class MonochromeImageData
 	
 	
 	/**
-	 * 
+	 * Returns the image data as a double array. The array is cloned to
+	 * prevent modification.
 	 */
-	// returns the generated input double array
-	// the array gets cloned to prevent modification
 	@Override
 	public double[] getData(){
 		return Arrays.copyOf(this.inputs, this.inputs.length);
