@@ -5,10 +5,25 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
 
-// generates the inputs for a neural network from an image
-// thread-safe (read only) after construction is finished
-// version: 1.0, date: 05.06.2016, author: Erik Fritzsche
-public class MonochromeImageInput{
+import de.ef.neuralnetworks.NeuralNetworkData;
+
+/**
+ * {@code MonochromeImageInput} generates the input for a
+ * {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetwork}
+ * from an monochrome image, it implements the
+ * {@link de.ef.neuralnetworks.NeuralNetworkData NeuralNetworkData}
+ * interface.
+ * <p>
+ * The {@link de.ef.neuralnetworks.NeuralNetworkData#getData() getData()}
+ * method is <b>thread-safe</b>.
+ * </p>
+ * 
+ * @author Erik Fritzsche
+ * @version 2.0
+ * @since 1.0
+ */
+public class MonochromeImageData
+	implements NeuralNetworkData{
 	
 	private final int width, height;
 	private final double[] inputs;
@@ -18,14 +33,14 @@ public class MonochromeImageInput{
 	// if that is not the case then the image is scaled to fit
 	// width times height must be the input size of the neural network for
 	// which the input is created
-	public MonochromeImageInput(BufferedImage image, int backgroundColor, int width, int height){
+	public MonochromeImageData(BufferedImage image, int backgroundColor, int width, int height){
 		this(image, backgroundColor, width, height, false);
 	}
 	
 	// the same as the other constructor but if stretch is set to true
 	// then the image is scaled and stretched in such a way that
 	// (scaledImage.getWidth() / width) equals (scaledImage.getHeight() / height)
-	public MonochromeImageInput(BufferedImage image, int backgroundColor, int width, int height, boolean stretch){
+	public MonochromeImageData(BufferedImage image, int backgroundColor, int width, int height, boolean stretch){
 		int imageWidth = image.getWidth(), imageHeight = image.getHeight();
 		
 		imageWidth += (width - (imageWidth % width));
@@ -72,9 +87,13 @@ public class MonochromeImageInput{
 	}
 	
 	
+	/**
+	 * 
+	 */
 	// returns the generated input double array
 	// the array gets cloned to prevent modification
-	public double[] getInputArray(){
+	@Override
+	public double[] getData(){
 		return Arrays.copyOf(this.inputs, this.inputs.length);
 	}
 	
