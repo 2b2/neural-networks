@@ -1,4 +1,4 @@
-package de.ef.neuralnetworks.utils.images;
+package de.ef.neuralnetworks.util.image;
 
 import java.awt.image.BufferedImage;
 
