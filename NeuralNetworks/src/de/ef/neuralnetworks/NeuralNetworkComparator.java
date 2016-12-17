@@ -93,11 +93,11 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 	}
 	
 	
-	public void train(Map<Long, Collection<T>> trainingSets, DoubleFunction<Boolean> completed) throws IOException{
+	public void train(Map<Long, ? extends Collection<T>> trainingSets, DoubleFunction<Boolean> completed) throws IOException{
 		List<TrainingData> allData = new LinkedList<>();
 		
 		int totalCount = 0;
-		for(Entry<Long, Collection<T>> container : trainingSets.entrySet())
+		for(Entry<Long, ? extends Collection<T>> container : trainingSets.entrySet())
 			for(Iterator<T> i = container.getValue().iterator(); i.hasNext(); totalCount++)
 				allData.add(new TrainingData(i.next().getData(), container.getKey()));
 		
@@ -118,7 +118,7 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 		long index = 0;
 		do{
 			// TODO make times to shuffle configurable
-			if(index++ % 100 == 0){
+			if(index++ % 200 == 0){
 				Collections.shuffle(allPairs, random);
 				validationPairs = allPairs.subList(0, validationSize);
 				trainingPairs = allPairs.subList(validationSize, allPairs.size());
@@ -142,58 +142,43 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 				
 				Double expectedResult = expected.get(pair.id);
 				if(expectedResult == null){
-					Double reversedResult = expected.get(pair.reverseId);
-					if(reversedResult == null){
-						expectedResult = this.compare.calculate(pair.data)[0];
-						if(expectedResult > GT_THRESHOLD)
-							totalError += this.compare.train(pair.data, GT_OUTPUT);
-						else
-							totalError += this.compare.train(pair.data, LT_OUTPUT);
-						expected.put(pair.id, expectedResult);
-						expected.put(pair.reverseId, 1 - expectedResult);
-					}
-					else{
-						if(reversedResult > GT_THRESHOLD)
-							totalError += this.compare.train(pair.data, LT_OUTPUT);
-						else
-							totalError += this.compare.train(pair.data, GT_OUTPUT);
-						reversedResult =
-							(reversedResult + (1 - this.compare.calculate(pair.data)[0])) / 2;
-						expected.put(pair.id, 1 - reversedResult);
-						expected.put(pair.reverseId, reversedResult);
-					}
+					// if expected result is null, reversed result is too
+					expectedResult = this.compare.calculate(pair.data)[0];
+					if(expectedResult > GT_THRESHOLD)
+						totalError += this.compare.train(pair.data, GT_OUTPUT);
+					else
+						totalError += this.compare.train(pair.data, LT_OUTPUT);
+					
+					expectedResult = this.compare.calculate(pair.data)[0]; // recalculate after training
+					expected.put(pair.id, expectedResult);
+					expected.put(pair.reverseId, 1 - expectedResult);
 				}
 				else{
+					// if expected result is not null, reversed result is too
 					expectedResult =
 						(expectedResult + this.compare.calculate(pair.data)[0]) / 2;
 					
 					Double reversedResult = expected.get(pair.reverseId);
-					if(reversedResult == null){
-						if(expectedResult > GT_THRESHOLD)
-							totalError += this.compare.train(pair.data, GT_OUTPUT);
-						else
-							totalError += this.compare.train(pair.data, LT_OUTPUT);
-						expected.put(pair.id, expectedResult);
-						expected.put(pair.reverseId, 1 - expectedResult);
-					}
-					else{
-						if(expectedResult > GT_THRESHOLD && reversedResult <= GT_THRESHOLD)
-							totalError += this.compare.train(pair.data, GT_OUTPUT);
-						else if(expectedResult <= GT_THRESHOLD && reversedResult > GT_THRESHOLD)
-							totalError += this.compare.train(pair.data, LT_OUTPUT);
-						else if(expectedResult > GT_THRESHOLD && reversedResult > GT_THRESHOLD)
-							totalError += this.compare.train(
-								pair.data,
-								expectedResult < reversedResult ? LT_OUTPUT : GT_OUTPUT
-							);
-						else
-							totalError += this.compare.train(
-								pair.data,
-								expectedResult > reversedResult ? GT_OUTPUT : LT_OUTPUT
-							);
-						expected.put(pair.id, expectedResult);
-						expected.put(pair.reverseId, (reversedResult + (1 - expectedResult)) / 2);
-					}
+					
+					if(expectedResult > GT_THRESHOLD && reversedResult <= GT_THRESHOLD)
+						totalError += this.compare.train(pair.data, GT_OUTPUT);
+					else if(expectedResult <= GT_THRESHOLD && reversedResult > GT_THRESHOLD)
+						totalError += this.compare.train(pair.data, LT_OUTPUT);
+					else if(expectedResult > GT_THRESHOLD && reversedResult > GT_THRESHOLD)
+						totalError += this.compare.train(
+							pair.data,
+							expectedResult < reversedResult ? LT_OUTPUT : GT_OUTPUT
+						);
+					else
+						totalError += this.compare.train(
+							pair.data,
+							expectedResult > reversedResult ? GT_OUTPUT : LT_OUTPUT
+						);
+					
+					expectedResult =
+						(expected.get(pair.id) + this.compare.calculate(pair.data)[0]) / 2; // recalculate after training
+					expected.put(pair.id, expectedResult);
+					expected.put(pair.reverseId, (reversedResult + (1 - expectedResult)) / 2);
 				}
 			}
 		}
