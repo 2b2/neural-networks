@@ -3,7 +3,6 @@ package de.ef.neuralnetworks.test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -38,7 +37,7 @@ public class ComparatorTest{
 		
 		Comparator<NeuralNetworkData> reverse = comparator.reversed();
 		
-		Map<Long, Collection<NeuralNetworkData>> testSets = new HashMap<>();
+		Map<Long, List<NeuralNetworkData>> testSets = new HashMap<>();
 		testSets.put(0L, Arrays.asList(() -> new double[]{0.0}));
 		testSets.put(0L, Arrays.asList(() -> new double[]{0.01}));
 
@@ -72,13 +71,13 @@ public class ComparatorTest{
 		comparator.train(testSets, error -> error < 0.001);
 		
 		Collections.shuffle(merged);
-		System.out.println(this.toString(merged));
+		System.out.println("Random: " + this.toString(merged));
 		merged.sort(comparator);
 		
 		List<NeuralNetworkData> reversed = new ArrayList<>(merged);
 		reversed.sort(reverse);
 		
-		System.out.println(this.toString(merged));
+		System.out.println("Sorted: " + this.toString(merged));
 		
 		Collections.reverse(reversed);
 		if(merged.equals(reversed) == false)
