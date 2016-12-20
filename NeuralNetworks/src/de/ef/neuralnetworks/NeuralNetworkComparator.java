@@ -16,7 +16,7 @@ import java.util.function.DoubleFunction;
 
 /**
  * {@code NeuralNetworkComparator} is a {@link java.util.Comparator Comparator}
- * which uses a {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetwork} to
+ * which uses {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetworks} to
  * figure out if two values are the same or which one is greater.
  * <p>
  * The functionality of this class could be useful to for example
