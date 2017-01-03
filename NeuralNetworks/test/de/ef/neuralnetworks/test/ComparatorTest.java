@@ -23,7 +23,7 @@ public class ComparatorTest{
 	
 	
 	@Test
-	public void text() throws IOException{
+	public void test() throws IOException{
 		String config = "{\"implementation\": \"SlowWave\", \"layers\": [2, 3, 1]}";
 
 		NeuralNetwork same = NeuralNetworkFactory.create(config);
