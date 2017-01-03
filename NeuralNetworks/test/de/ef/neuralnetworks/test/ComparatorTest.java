@@ -38,27 +38,12 @@ public class ComparatorTest{
 		Comparator<NeuralNetworkData> reverse = comparator.reversed();
 		
 		Map<Long, List<NeuralNetworkData>> testSets = new HashMap<>();
-		testSets.put(0L, Arrays.asList(() -> new double[]{0.0}));
-		testSets.put(0L, Arrays.asList(() -> new double[]{0.01}));
-
-		testSets.put(1L, Arrays.asList(() -> new double[]{0.19}));
-		testSets.put(1L, Arrays.asList(() -> new double[]{0.2}));
-		testSets.put(1L, Arrays.asList(() -> new double[]{0.21}));
-		
-		testSets.put(2L, Arrays.asList(() -> new double[]{0.39}));
-		testSets.put(2L, Arrays.asList(() -> new double[]{0.4}));
-		testSets.put(2L, Arrays.asList(() -> new double[]{0.41}));
-		
-		testSets.put(3L, Arrays.asList(() -> new double[]{0.59}));
-		testSets.put(3L, Arrays.asList(() -> new double[]{0.6}));
-		testSets.put(3L, Arrays.asList(() -> new double[]{0.61}));
-		
-		testSets.put(4L, Arrays.asList(() -> new double[]{0.79}));
-		testSets.put(4L, Arrays.asList(() -> new double[]{0.8}));
-		testSets.put(4L, Arrays.asList(() -> new double[]{0.81}));
-		
-		testSets.put(5L, Arrays.asList(() -> new double[]{0.99}));
-		testSets.put(5L, Arrays.asList(() -> new double[]{1.0}));
+		testSets.put(0L, Arrays.asList(() -> new double[]{0.0}, () -> new double[]{0.01}));
+		testSets.put(1L, Arrays.asList(() -> new double[]{0.19}, () -> new double[]{0.2}, () -> new double[]{0.21}));
+		testSets.put(2L, Arrays.asList(() -> new double[]{0.39}, () -> new double[]{0.4}, () -> new double[]{0.41}));
+		testSets.put(3L, Arrays.asList(() -> new double[]{0.59}, () -> new double[]{0.6}, () -> new double[]{0.61}));
+		testSets.put(4L, Arrays.asList(() -> new double[]{0.79}, () -> new double[]{0.8}, () -> new double[]{0.81}));
+		testSets.put(5L, Arrays.asList(() -> new double[]{0.99}, () -> new double[]{1.0}));
 		
 		List<NeuralNetworkData> merged = new ArrayList<>();
 		merged.add(() -> new double[]{0.0});
