@@ -250,7 +250,7 @@ public class MultikeyTreeMap<K, V>{
 	public String toString(){
 		StringBuilder builder = new StringBuilder();
 		
-		int height = Math.min(this.root.height, 10 /* make max-height constant */);
+		int height = Math.min(this.root.height, 10 /* TODO make max-height constant */);
 		int level = 0, index = 0;
 		
 		Queue<Node> next = new LinkedList<>();
