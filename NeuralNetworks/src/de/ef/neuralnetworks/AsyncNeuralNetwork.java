@@ -7,7 +7,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
-import java.util.stream.DoubleStream;
 
 /**
  * The class {@code AsyncNeuralNetwork} makes a
@@ -23,13 +22,16 @@ import java.util.stream.DoubleStream;
  * <b>*</b>: In this configuration the neural-network has to be thread-safe.
  * </p>
  * 
+ * @param I input type
+ * @param O output type
+ * 
  * @author Erik Fritzsche
- * @version 1.0
+ * @version 2.0
  * @since 1.0
  */
-public class AsyncNeuralNetwork{
+public class AsyncNeuralNetwork<I, O>{
 	
-	private final NeuralNetwork[] networks;
+	private final NeuralNetwork<I, O>[] networks;
 	private final BlockingQueue<AsyncDataContainer> queue;
 	private final ExecutorService producer;
 	
@@ -41,7 +43,7 @@ public class AsyncNeuralNetwork{
 	 * @param network the asynchronously accessed
 	 * {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetwork}
 	 */
-	public AsyncNeuralNetwork(NeuralNetwork network){
+	public AsyncNeuralNetwork(NeuralNetwork<I, O> network){
 		this(network, 1);
 	}
 	
@@ -58,7 +60,8 @@ public class AsyncNeuralNetwork{
 	 * {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetwork}
 	 * @param producerCount number of used producer threads
 	 */
-	public AsyncNeuralNetwork(NeuralNetwork network, int producerCount){
+	@SuppressWarnings("unchecked")
+	public AsyncNeuralNetwork(NeuralNetwork<I, O> network, int producerCount){
 		this(new NeuralNetwork[]{network}, producerCount);
 	}
 	
@@ -70,12 +73,12 @@ public class AsyncNeuralNetwork{
 	 * @param networks the asynchronously accessed
 	 * {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetworks}
 	 */
-	public AsyncNeuralNetwork(NeuralNetwork[] networks){
+	public AsyncNeuralNetwork(NeuralNetwork<I, O>[] networks){
 		this(networks, networks.length);
 	}
 	
 	// internal constructor and configuration
-	private AsyncNeuralNetwork(NeuralNetwork[] networks, int producerCount){
+	private AsyncNeuralNetwork(NeuralNetwork<I, O>[] networks, int producerCount){
 		this.networks = networks;
 		this.queue = new LinkedBlockingQueue<AsyncDataContainer>();
 		this.producer = Executors.newFixedThreadPool(
@@ -92,7 +95,7 @@ public class AsyncNeuralNetwork{
 		);
 		// start up all producer thread
 		for(int i = 0; i < producerCount; i++){
-			NeuralNetwork network = this.networks[i % this.networks.length];
+			NeuralNetwork<I, O> network = this.networks[i % this.networks.length];
 			this.producer.execute(
 				() -> this.asyncCalculate(network)
 			);
@@ -105,30 +108,28 @@ public class AsyncNeuralNetwork{
 	 * {@link de.ef.neuralnetworks.NeuralNetwork#calculate(double[]) NeuralNetwork.calculate}
 	 * function.
 	 * 
-	 * @param inputs the states of the neurons inside the first layer
+	 * @param input the state of the neurons inside the first layer
 	 * 
 	 * @return a {@link java.util.concurrent.Future Future} with
-	 * the output states of the neurons inside the last layer
+	 * the output state of the neurons inside the last layer
 	 */
-	public Future<Double[]> calculate(double inputs[]){
-		CompletableFuture<Double[]> outputsFuture = new CompletableFuture<Double[]>();
-		this.queue.add(new AsyncDataContainer(inputs, outputsFuture));
+	public Future<O> calculate(I input){
+		CompletableFuture<O> outputFuture = new CompletableFuture<O>();
+		this.queue.add(new AsyncDataContainer(input, outputFuture));
 		// TODO may hide that Future<Double[]> is CompletableFuture<Double[]>
-		return (Future<Double[]>)outputsFuture;
+		return (Future<O>)outputFuture;
 	}
 	
 	
 	// TODO may overwork
-	private void asyncCalculate(NeuralNetwork network){
+	private void asyncCalculate(NeuralNetwork<I, O> network){
 		while(this.producer.isShutdown() == false){
 			AsyncDataContainer container;
 			try{
 				container = this.queue.take();
 				
-				double outputs[] = network.calculate(container.getInputs());
-				container.getOutputsFuture().complete(
-					DoubleStream.of(outputs).boxed().toArray(Double[]::new)
-				);
+				O output = network.calculate(container.input);
+				container.outputFuture.complete(output);
 			}catch(Throwable t){
 				this.producer.shutdown();
 				throw new RuntimeException(t);
@@ -140,22 +141,13 @@ public class AsyncNeuralNetwork{
 	
 	private class AsyncDataContainer{
 		
-		private double inputs[];
-		private CompletableFuture<Double[]> outputsFuture;
+		private final I input;
+		private final CompletableFuture<O> outputFuture;
 		
 		
-		public AsyncDataContainer(double inputs[], CompletableFuture<Double[]> outputsFuture){
-			this.inputs = inputs;
-			this.outputsFuture = outputsFuture;
-		}
-		
-		
-		public double[] getInputs(){
-			return this.inputs;
-		}
-		
-		public CompletableFuture<Double[]> getOutputsFuture(){
-			return this.outputsFuture;
+		public AsyncDataContainer(I input, CompletableFuture<O> outputFuture){
+			this.input = input;
+			this.outputFuture = outputFuture;
 		}
 	}
 }

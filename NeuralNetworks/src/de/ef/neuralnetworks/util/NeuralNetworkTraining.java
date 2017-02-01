@@ -7,7 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Map.Entry;
-import java.util.function.DoubleFunction;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 import de.ef.neuralnetworks.NeuralNetwork;
 
@@ -20,26 +21,27 @@ public final class NeuralNetworkTraining{
 	
 	
 	
-	public static void train(
-			NeuralNetwork network, Map<double[], double[]> dataSets,
-			DoubleFunction<Boolean> completed) throws IOException{
+	public static <I, O> void train(
+			NeuralNetwork<I, O> network, Map<I, O> dataSets,
+			BiFunction<O, O, Double> errorCalculator, Predicate<Double> completed) throws IOException{
 		
-		NeuralNetworkTraining.train(network, dataSets, completed, DEFAULT_VALIDATION_PERCENT);
+		NeuralNetworkTraining.train(network, dataSets, errorCalculator, completed, DEFAULT_VALIDATION_PERCENT);
 	}
 	
-	public static void train(
-			NeuralNetwork network, Map<double[], double[]> dataSet,
-			DoubleFunction<Boolean> completed, int validationPercent) throws IOException{
+	public static <I, O> void train(
+			NeuralNetwork<I, O> network, Map<I, O> dataSet,
+			BiFunction<O, O, Double> errorCalculator, Predicate<Double> completed,
+			int validationPercent) throws IOException{
 		
 		if(validationPercent < 0 || validationPercent > MAX_VALIDATION_PERCENT)
 			throw new IllegalArgumentException("Validation percentage not possible: " + validationPercent);
 		int validationSize = (int)(dataSet.size() * (validationPercent / 100.0));
 		
-		List<Entry<double[], double[]>> dataSetList = new ArrayList<>(dataSet.size());
-		for(Entry<double[], double[]> entry : dataSet.entrySet())
+		List<Entry<I, O>> dataSetList = new ArrayList<>(dataSet.size());
+		for(Entry<I, O> entry : dataSet.entrySet())
 			dataSetList.add(entry);
 		
-		List<Entry<double[], double[]>> trainingSet = null, validationSet = null;
+		List<Entry<I, O>> trainingSet = null, validationSet = null;
 		
 		Random random = new Random();
 		double totalError;
@@ -53,20 +55,17 @@ public final class NeuralNetworkTraining{
 			}
 			
 			// train
-			for(Entry<double[], double[]> entry : trainingSet)
+			for(Entry<I, O> entry : trainingSet)
 				network.train(entry.getKey(), entry.getValue());
 			
 			// validate
 			totalError = 0;
-			for(Entry<double[], double[]> entry : validationSet){
-				double outputs[] = network.calculate(entry.getKey());
-				double expectedOutputs[] = entry.getValue();
+			for(Entry<I, O> entry : validationSet){
+				O output = network.calculate(entry.getKey());
+				O expectedOutput = entry.getValue();
 				
-				double error = 0;
-				for(int i = 0; i < outputs.length; i++)
-					error += expectedOutputs[i] - outputs[i];
-				totalError += error / outputs.length;
+				totalError += errorCalculator.apply(output, expectedOutput);
 			}
-		}while(completed.apply(totalError) == false);
+		}while(completed.test(totalError) == false);
 	}
 }

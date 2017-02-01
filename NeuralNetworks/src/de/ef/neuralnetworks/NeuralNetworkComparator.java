@@ -12,7 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
-import java.util.function.DoubleFunction;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 /**
  * {@code NeuralNetworkComparator} is a {@link java.util.Comparator Comparator}
@@ -31,59 +32,57 @@ import java.util.function.DoubleFunction;
  * training routines.
  * </p>
  * 
- * @param <T> the {@link de.ef.neuralnetworks.NeuralNetworkData NeuralNetworkData}
- *            type that has to be compared
+ * @param I type of values to compare
  * 
  * @author Erik Fritzsche
- * @version 1.0
+ * @version 2.0
  * @since 1.0
  */
-public class NeuralNetworkComparator<T extends NeuralNetworkData>
-	implements Comparator<T>{
+public class NeuralNetworkComparator<I>
+	implements Comparator<I>{
 	
 	/**
 	 * Constant to indicate the result of the comparison, the closer the
 	 * output of the neural network the more likely the result.
 	 */
-	public final static double NOT_EQUAL = 0.0, EQUAL = 1.0, LESS_THAN = 0.0, GREATER_THAN = 1.0;
-	
+	private final static float NOT_EQUAL = 0f, EQUAL = 1f, LESS_THAN = 0f, GREATER_THAN = 1f;
 	
 	/**
 	 * Constant to indicate the cutoff point of the result.
 	 */
-	private final static double E_THRESHOLD = 0.5, GT_THRESHOLD = 0.5;
+	private final static float E_THRESHOLD = 0.5f, GT_THRESHOLD = 0.5f;
+	
+	
+	
+	private final NeuralNetwork<Object, Float> equal, compare;
+	private final BiFunction<I, I, Object> inputConverter;
+	
 	
 	/**
-	 * Internal cache so that the array is not created every time it is needed.
+	 * Constructs a new {@code NeuralNetworkComparator}.
+	 * 
+	 * @param equal tests two inputs for equality (a output of {@code 1} means equal)
+	 * @param compare checks for the bigger value (a output of {@code 1} means the first value is bigger than the second)
+	 * @param inputConverter combines two inputs into one object consumable by {@code equal} and {@code compare}
 	 */
-	private final static double
-		NE_OUTPUT[] = {NOT_EQUAL}, E_OUTPUT[] = {EQUAL},
-		LT_OUTPUT[] = {LESS_THAN}, GT_OUTPUT[] = {GREATER_THAN};
-	
-	
-	
-	private final NeuralNetwork equal, compare;
-	
-	
-	public NeuralNetworkComparator(NeuralNetwork equal, NeuralNetwork compare){
-		this.equal = equal;
-		this.compare = compare;
+	@SuppressWarnings("unchecked")
+	public <C> NeuralNetworkComparator(NeuralNetwork<C, Float> equal, NeuralNetwork<C, Float> compare, BiFunction<I, I, C> inputConverter){
+		this.equal = (NeuralNetwork<Object, Float>)equal;
+		this.compare = (NeuralNetwork<Object, Float>)compare;
+		
+		this.inputConverter = (BiFunction<I, I, Object>)inputConverter;
 	}
 	
 	
 	@Override
-	public int compare(T a, T b){
+	public int compare(I a, I b){
 		try{
-			double aData[] = a.getData(), bData[] = b.getData();
-			double inputs[] = new double[aData.length + bData.length];
+			Object input = this.inputConverter.apply(a, b); 
 			
-			System.arraycopy(aData, 0, inputs, 0, aData.length);
-			System.arraycopy(bData, 0, inputs, aData.length, bData.length);
-			
-			if(this.equal.calculate(inputs)[0] > E_THRESHOLD)
+			if(this.equal.calculate(input) > E_THRESHOLD)
 				return 0;
 			
-			if(this.compare.calculate(inputs)[0] > GT_THRESHOLD)
+			if(this.compare.calculate(input) > GT_THRESHOLD)
 				return 1;
 			return -1;
 		}
@@ -93,13 +92,13 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 	}
 	
 	
-	public void train(Map<Long, ? extends Collection<T>> trainingSets, DoubleFunction<Boolean> completed) throws IOException{
+	public void train(Map<Long, ? extends Collection<I>> trainingSets, Predicate<Double> completed) throws IOException{
 		List<TrainingData> allData = new LinkedList<>();
 		
 		int totalCount = 0;
-		for(Entry<Long, ? extends Collection<T>> container : trainingSets.entrySet())
-			for(Iterator<T> i = container.getValue().iterator(); i.hasNext(); totalCount++)
-				allData.add(new TrainingData(i.next().getData(), container.getKey()));
+		for(Entry<Long, ? extends Collection<I>> container : trainingSets.entrySet())
+			for(Iterator<I> i = container.getValue().iterator(); i.hasNext(); totalCount++)
+				allData.add(new TrainingData(i.next(), container.getKey()));
 		
 		List<OrderedPair> allPairs, trainingPairs = null, validationPairs = null;
 		
@@ -111,7 +110,7 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 		// TODO make validation percentage configurable
 		int validationSize = (int)(allPairs.size() * (20 / 100.0));
 		
-		Map<String, Double> expected = new HashMap<>(allPairs.size());
+		Map<String, Float> expected = new HashMap<>(allPairs.size());
 		
 		Random random = new Random();
 		double error;
@@ -125,58 +124,58 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 			}
 			/* error = */this.train(trainingPairs, expected);
 			error = this.validate(validationPairs, expected);
-		}while(completed.apply(error) == false);
+		}while(completed.test(error) == false);
 	}
 	
-	protected double train(Collection<OrderedPair> pairs, Map<String, Double> expected) throws IOException{
+	protected double train(Collection<OrderedPair> pairs, Map<String, Float> expected) throws IOException{
 		double totalError = 0;
 		
 		int count = 0;
 		for(OrderedPair pair : pairs){
 			count++;
 			if(pair.same == true)
-				totalError += this.equal.train(pair.data, E_OUTPUT);
+				totalError += this.equal.train(pair.data, EQUAL);
 			else{
-				totalError += this.equal.train(pair.data, NE_OUTPUT);
+				totalError += this.equal.train(pair.data, NOT_EQUAL);
 				count++;
 				
-				Double expectedResult = expected.get(pair.id);
+				Float expectedResult = expected.get(pair.id);
 				if(expectedResult == null){
 					// if expected result is null, reversed result is too
-					expectedResult = this.compare.calculate(pair.data)[0];
+					expectedResult = this.compare.calculate(pair.data);
 					if(expectedResult > GT_THRESHOLD)
-						totalError += this.compare.train(pair.data, GT_OUTPUT);
+						totalError += this.compare.train(pair.data, GREATER_THAN);
 					else
-						totalError += this.compare.train(pair.data, LT_OUTPUT);
+						totalError += this.compare.train(pair.data, LESS_THAN);
 					
-					expectedResult = this.compare.calculate(pair.data)[0]; // recalculate after training
+					expectedResult = this.compare.calculate(pair.data); // recalculate after training
 					expected.put(pair.id, expectedResult);
 					expected.put(pair.reverseId, 1 - expectedResult);
 				}
 				else{
 					// if expected result is not null, reversed result is too
 					expectedResult =
-						(expectedResult + this.compare.calculate(pair.data)[0]) / 2;
+						(expectedResult + this.compare.calculate(pair.data)) / 2;
 					
-					Double reversedResult = expected.get(pair.reverseId);
+					Float reversedResult = expected.get(pair.reverseId);
 					
 					if(expectedResult > GT_THRESHOLD && reversedResult <= GT_THRESHOLD)
-						totalError += this.compare.train(pair.data, GT_OUTPUT);
+						totalError += this.compare.train(pair.data, GREATER_THAN);
 					else if(expectedResult <= GT_THRESHOLD && reversedResult > GT_THRESHOLD)
-						totalError += this.compare.train(pair.data, LT_OUTPUT);
+						totalError += this.compare.train(pair.data, LESS_THAN);
 					else if(expectedResult > GT_THRESHOLD && reversedResult > GT_THRESHOLD)
 						totalError += this.compare.train(
 							pair.data,
-							expectedResult < reversedResult ? LT_OUTPUT : GT_OUTPUT
+							expectedResult < reversedResult ? LESS_THAN : GREATER_THAN
 						);
 					else
 						totalError += this.compare.train(
 							pair.data,
-							expectedResult > reversedResult ? GT_OUTPUT : LT_OUTPUT
+							expectedResult > reversedResult ? GREATER_THAN : LESS_THAN
 						);
 					
 					expectedResult =
-						(expected.get(pair.id) + this.compare.calculate(pair.data)[0]) / 2; // recalculate after training
+						(expected.get(pair.id) + this.compare.calculate(pair.data)) / 2; // recalculate after training
 					expected.put(pair.id, expectedResult);
 					expected.put(pair.reverseId, (reversedResult + (1 - expectedResult)) / 2);
 				}
@@ -185,13 +184,13 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 		return totalError / count;
 	}
 	
-	protected double validate(Collection<OrderedPair> pairs, Map<String, Double> expected) throws IOException{
+	protected double validate(Collection<OrderedPair> pairs, Map<String, Float> expected) throws IOException{
 		double totalError = 0;
 		for(OrderedPair pair : pairs){
 			if(pair.same == true)
-				totalError += (EQUAL - this.equal.calculate(pair.data)[0]);
+				totalError += (EQUAL - this.equal.calculate(pair.data));
 			else{
-				Double expectedResult = expected.get(pair.id);
+				Float expectedResult = expected.get(pair.id);
 				// if for some reason there is no expected result for this pair
 				// skip and add highest error to total-error
 				if(expectedResult == null){
@@ -199,9 +198,9 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 					continue;
 				}
 				if(expectedResult > GT_THRESHOLD)
-					totalError += (GREATER_THAN - this.compare.calculate(pair.data)[0]);
+					totalError += (GREATER_THAN - this.compare.calculate(pair.data));
 				else
-					totalError += (this.compare.calculate(pair.data)[0]);
+					totalError += (this.compare.calculate(pair.data));
 			}
 		}
 		return totalError / pairs.size();
@@ -209,31 +208,28 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 	
 	
 	
-	private static class TrainingData{
+	private class TrainingData{
 		
-		private final double data[];
+		private final I data;
 		private final long containerId;
 		
 		
-		public TrainingData(double data[], long containerId){
+		public TrainingData(I data, long containerId){
 			this.data = data;
 			this.containerId = containerId;
 		}
 	}
 	
-	
-	private static class OrderedPair{
+	private class OrderedPair{
 		
 		private final String id, reverseId;
 		private final boolean same;
-		private final double data[];
+		private final Object data;
 		
 		
 		public OrderedPair(TrainingData a, TrainingData b){
-			this.data = new double[a.data.length + b.data.length];
-			
-			System.arraycopy(a.data, 0, this.data, 0, a.data.length);
-			System.arraycopy(b.data, 0, this.data, a.data.length, b.data.length);
+			this.data =
+				NeuralNetworkComparator.this.inputConverter.apply(a.data, b.data);
 			
 			this.id =
 				Long.toHexString(a.containerId) + "#" + Long.toHexString(b.containerId);
@@ -251,10 +247,8 @@ public class NeuralNetworkComparator<T extends NeuralNetworkData>
 		}
 		
 		@Override
+		@SuppressWarnings("unchecked")
 		public boolean equals(Object other){
-			if(other instanceof OrderedPair == false)
-				return false;
-			
 			return this.id == ((OrderedPair)other).id;
 		}
 	}
