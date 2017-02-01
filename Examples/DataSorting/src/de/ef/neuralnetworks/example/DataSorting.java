@@ -1,4 +1,4 @@
-package de.ef.neuralnetworks.examples;
+package de.ef.neuralnetworks.example;
 
 import java.awt.Color;
 import java.awt.image.BufferedImage;
@@ -11,6 +11,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
@@ -24,25 +26,22 @@ import java.util.zip.ZipFile;
 import javax.imageio.ImageIO;
 
 import de.ef.neuralnetworks.NeuralNetwork;
+import de.ef.neuralnetworks.NeuralNetworkComparator;
+import de.ef.neuralnetworks.NeuralNetworkData;
 import de.ef.neuralnetworks.NeuralNetworkFactory;
-import de.ef.neuralnetworks.util.NeuralNetworkTraining;
 import de.ef.neuralnetworks.util.image.MonochromeImageData;
 
-public class DigitRecognition{
-	
-	private final static double OUTPUTS[][] = {
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 1, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 1, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 1, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 1, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 1, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
-	};
-	
+/**
+ * This example tries to sort a data-set consisting of the digits 0-9.
+ * <p>
+ * The whole thing with data sorting is just an experiment that has a high
+ * possibility to fail. Maybe some data formats work better then others,
+ * but binary images of handwritten digits do not seam to work at all.
+ * </p>
+ * 
+ * @author Erik Fritzsche
+ */
+public class DataSorting{
 	
 	public static void main(String ... args) throws IOException, ClassNotFoundException{
 		File dataSet = new File("../../Datasets/digits.dataset.zip");
@@ -52,24 +51,26 @@ public class DigitRecognition{
 				"Dataset not found. (Expected at " + dataSet.getAbsolutePath() + ")"
 			);
 		
-		NeuralNetwork network;
+		NeuralNetwork equal, compare;
 		
 		File comparatorData = new File("./comp.dat");
 		if(comparatorData.exists() == false){
 			System.out.println("Creating new neural-networks...");
 			String config =
-				"{\"implementation\": \"SlowWave\", \"layers\": [256, 32, 10]}";
-			network = NeuralNetworkFactory.create(config);
+				"{\"implementation\": \"SlowWave\", \"layers\": [256, 32, 1]}";
+			equal = NeuralNetworkFactory.create(config);
+			compare = NeuralNetworkFactory.create(config);
 		}
 		else{
 			System.out.println("Loading neural-networks from file...");
 			try(ObjectInputStream input =
 					new ObjectInputStream(new FileInputStream(comparatorData))){
-				network = (NeuralNetwork)input.readObject();
+				equal = (NeuralNetwork)input.readObject();
+				compare = (NeuralNetwork)input.readObject();
 			}
 		}
 		
-		DigitRecognition recognition = new DigitRecognition(new ZipFile(dataSet), network);
+		DataSorting sorting = new DataSorting(new ZipFile(dataSet), equal, compare);
 		
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 		
@@ -78,8 +79,8 @@ public class DigitRecognition{
 		
 		System.out.println("Starting training...");
 		executor.execute(
-			() -> recognition.train(e -> {
-				if(index.getAndIncrement() % 100 == 0)
+			() -> sorting.train(e -> {
+				if(index.getAndIncrement() % 10 == 0)
 					System.out.println(e);
 				return interrupt.get();
 			})
@@ -91,7 +92,7 @@ public class DigitRecognition{
 		interrupt.set(true);
 		
 		// after training finished start next task and save neural-networks to disk
-		/*executor.execute(() -> {
+		executor.execute(() -> {
 			System.out.println("Saving neural-networks...");
 			try(ObjectOutputStream output =
 					new ObjectOutputStream(new FileOutputStream(comparatorData))){
@@ -104,37 +105,37 @@ public class DigitRecognition{
 			}
 			System.out.println("Finished!");
 			System.exit(0);
-		});*/
+		});
 	}
 	
 	
 	
 	private final ZipFile dataSet;
-	private Map<double[], double[]> data;
+	private Map<Long, List<NeuralNetworkData>> data;
 	
-	private NeuralNetwork network;
+	private NeuralNetworkComparator<NeuralNetworkData> comparator;
 	
 	
-	public DigitRecognition(ZipFile dataSet, NeuralNetwork network){
+	public DataSorting(ZipFile dataSet, NeuralNetwork equal, NeuralNetwork compare){
 		this.dataSet = dataSet;
 		
-		this.network = network;
+		this.comparator = new NeuralNetworkComparator<>(equal, compare);
 	}
 	
 	
 	public void train(DoubleFunction<Boolean> completed){
 		if(this.data == null){
-			Map<Byte, BufferedImage> images = new HashMap<>();
+			Map<Long, BufferedImage> images = new HashMap<>();
 			
 			try{
-				Enumeration<? extends ZipEntry> entries = dataSet.entries();
+				Enumeration<? extends ZipEntry> entries = this.dataSet.entries();
 				while(entries.hasMoreElements()){
 					ZipEntry entry = entries.nextElement();
 					
 					if(entry.isDirectory() == false){
 						String name =
 							entry.getName().substring(0, entry.getName().indexOf('/'));
-						images.put(Byte.valueOf(name), ImageIO.read(dataSet.getInputStream(entry)));
+						images.put(Long.valueOf(name), ImageIO.read(this.dataSet.getInputStream(entry)));
 					}
 				}
 			}
@@ -142,20 +143,21 @@ public class DigitRecognition{
 				throw new RuntimeException(e);
 			}
 			
-			Map<double[], double[]> data = new HashMap<>();
-			for(Entry<Byte, BufferedImage> image : images.entrySet()){
-				data.put(
-					new MonochromeImageData(image.getValue(), Color.WHITE.getRGB(), 16, 16, true)
-						.getData(),
-					DigitRecognition.OUTPUTS[image.getKey()]
-				);
+			Map<Long, List<NeuralNetworkData>> data = new HashMap<>();
+			for(Entry<Long, BufferedImage> image : images.entrySet()){
+				List<NeuralNetworkData> container = data.get(image.getKey());
+				if(container == null)
+					data.put(image.getKey(), container = new LinkedList<>());
+				// FIXME just testing stuff here
+				if(container.size() < 5)
+					container.add(new MonochromeImageData(image.getValue(), Color.WHITE.getRGB(), 16, 16, true));
 			}
 			
 			this.data = data;
 		}
 		
 		try{
-			NeuralNetworkTraining.train(this.network, this.data, completed);
+			this.comparator.train(this.data, completed);
 		}
 		catch(IOException e){
 			throw new RuntimeException(e);
