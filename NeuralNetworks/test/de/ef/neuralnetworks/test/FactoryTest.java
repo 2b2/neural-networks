@@ -1,10 +1,14 @@
 package de.ef.neuralnetworks.test;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.junit.Assert;
 import org.junit.Test;
 
 import de.ef.neuralnetworks.NeuralNetwork;
-import de.ef.neuralnetworks.NeuralNetworkFactory;
+import de.ef.neuralnetworks.NeuralNetworkContext;
+import de.ef.neuralnetworks.NeuralNetworkContextFactory;
 
 public class FactoryTest{
 
@@ -12,10 +16,13 @@ public class FactoryTest{
 	
 	
 	@Test
-	public void test(){
-		String config = "{\"implementation\": \"SlowWave\", \"layers\": [3, 2, 1]}";
+	public void test() throws ClassNotFoundException{
+		Map<String, Object> properties = new HashMap<>();
 		
-		NeuralNetwork network = NeuralNetworkFactory.create(config);
+		Class.forName("de.ef.slowwave.SlowWaveContext");
+		NeuralNetworkContext context = NeuralNetworkContextFactory.create("SlowWave");
+		
+		NeuralNetwork<double[], double[]> network = context.createNeuralNetwork(double[].class, double[].class, properties);
 		
 		if(network == null)
 			Assert.fail("The returned network is null.");
