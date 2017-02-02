@@ -20,8 +20,8 @@ import de.ef.neuralnetworks.NeuralNetwork;
  * @version 1.0
  * @since 1.0
  */
-public class SlowWave
-	implements NeuralNetwork{
+public class SlowWave // FIXME make generic
+	implements NeuralNetwork<double[], double[]>{
 	
 	/**
 	 * Make always same as @version in JavaDoc in format xxx.yyy.zzz
