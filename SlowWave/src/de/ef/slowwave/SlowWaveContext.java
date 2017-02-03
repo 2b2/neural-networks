@@ -30,8 +30,15 @@ public class SlowWaveContext
 	@Override
 	@SuppressWarnings("unchecked")
 	public <I, O> NeuralNetwork<I, O> createNeuralNetwork(Class<I> inputClass, Class<O> outputClass, Map<String, Object> properties){
+		int inputLayerSize = (Integer)properties.get(INPUT_LAYER_SIZE);
+		int outputLayerSize = (Integer)properties.get(OUTPUT_LAYER_SIZE);
+		int hiddenLayerCount = (Integer)properties.get(HIDDEN_LAYER_COUNT);
+		int hiddenLayerSizes[] = new int[hiddenLayerCount];
+		for(int i = 0; i < hiddenLayerCount; i++)
+			hiddenLayerSizes[i] = (Integer)properties.get(HIDDEN_LAYER_SIZE.replace("*", String.valueOf(i)));
+		
 		if(inputClass == double[].class && outputClass == double[].class)
-			return (NeuralNetwork<I, O>)new SlowWave(0, new int[]{0}, 0); // FIXME sizes
+			return (NeuralNetwork<I, O>)new SlowWave(inputLayerSize, hiddenLayerSizes, outputLayerSize);
 		return null;
 	}
 }
