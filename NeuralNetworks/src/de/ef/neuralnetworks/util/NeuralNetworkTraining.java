@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Map.Entry;
 import java.util.function.BiFunction;
@@ -22,14 +21,14 @@ public final class NeuralNetworkTraining{
 	
 	
 	public static <I, O> void train(
-			NeuralNetwork<I, O> network, Map<I, O> dataSets,
+			NeuralNetwork<I, O> network, List<Entry<I, O>> dataSets,
 			BiFunction<O, O, Double> errorCalculator, Predicate<Double> completed) throws IOException{
 		
 		NeuralNetworkTraining.train(network, dataSets, errorCalculator, completed, DEFAULT_VALIDATION_PERCENT);
 	}
 	
 	public static <I, O> void train(
-			NeuralNetwork<I, O> network, Map<I, O> dataSet,
+			NeuralNetwork<I, O> network, List<Entry<I, O>> dataSet,
 			BiFunction<O, O, Double> errorCalculator, Predicate<Double> completed,
 			int validationPercent) throws IOException{
 		
@@ -37,11 +36,7 @@ public final class NeuralNetworkTraining{
 			throw new IllegalArgumentException("Validation percentage not possible: " + validationPercent);
 		int validationSize = (int)(dataSet.size() * (validationPercent / 100.0));
 		
-		List<Entry<I, O>> dataSetList = new ArrayList<>(dataSet.size());
-		for(Entry<I, O> entry : dataSet.entrySet())
-			dataSetList.add(entry);
-		
-		List<Entry<I, O>> trainingSet = null, validationSet = null;
+		List<Entry<I, O>> dataSetCopy = new ArrayList<>(dataSet), trainingSet = null, validationSet = null;
 		
 		Random random = new Random();
 		double totalError;
@@ -49,9 +44,9 @@ public final class NeuralNetworkTraining{
 		do{
 			// TODO make times to shuffle configurable
 			if(index++ % 200 == 0){
-				Collections.shuffle(dataSetList, random);
-				validationSet = dataSetList.subList(0, validationSize);
-				trainingSet = dataSetList.subList(validationSize, dataSetList.size());
+				Collections.shuffle(dataSetCopy, random);
+				validationSet = dataSetCopy.subList(0, validationSize);
+				trainingSet = dataSetCopy.subList(validationSize, dataSetCopy.size());
 			}
 			
 			// train
