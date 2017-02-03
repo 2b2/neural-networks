@@ -5,8 +5,6 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
 
-import de.ef.neuralnetworks.NeuralNetworkData;
-
 /**
  * {@code MonochromeImageInput} generates the input for a
  * {@link de.ef.neuralnetworks.NeuralNetwork NeuralNetwork}
@@ -22,8 +20,7 @@ import de.ef.neuralnetworks.NeuralNetworkData;
  * @version 2.0
  * @since 1.0
  */
-public class MonochromeImageData
-	implements NeuralNetworkData{
+public class MonochromeImageData{
 	
 	/**
 	 * Make always same as @version in JavaDoc in format xxx.yyy.zzz
@@ -98,7 +95,6 @@ public class MonochromeImageData
 	 * Returns the image data as a double array. The array is cloned to
 	 * prevent modification.
 	 */
-	@Override
 	public double[] getData(){
 		return Arrays.copyOf(this.inputs, this.inputs.length);
 	}
