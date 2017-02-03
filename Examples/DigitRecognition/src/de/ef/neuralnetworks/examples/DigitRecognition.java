@@ -17,14 +17,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.DoubleFunction;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import javax.imageio.ImageIO;
 
 import de.ef.neuralnetworks.NeuralNetwork;
-import de.ef.neuralnetworks.NeuralNetworkFactory;
+import de.ef.neuralnetworks.NeuralNetworkContext;
+import de.ef.neuralnetworks.NeuralNetworkContextFactory;
 import de.ef.neuralnetworks.util.NeuralNetworkTraining;
 import de.ef.neuralnetworks.util.image.MonochromeImageData;
 
@@ -44,6 +46,7 @@ public class DigitRecognition{
 	};
 	
 	
+	@SuppressWarnings("unchecked")
 	public static void main(String ... args) throws IOException, ClassNotFoundException{
 		File dataSet = new File("../../Datasets/digits.dataset.zip");
 		
@@ -52,20 +55,27 @@ public class DigitRecognition{
 				"Dataset not found. (Expected at " + dataSet.getAbsolutePath() + ")"
 			);
 		
-		NeuralNetwork network;
+		NeuralNetwork<double[], double[]> network;
 		
 		File comparatorData = new File("./comp.dat");
 		if(comparatorData.exists() == false){
 			System.out.println("Creating new neural-networks...");
-			String config =
-				"{\"implementation\": \"SlowWave\", \"layers\": [256, 32, 10]}";
-			network = NeuralNetworkFactory.create(config);
+			Class.forName("de.ef.slowwave.SlowWaveContext");
+			NeuralNetworkContext context = NeuralNetworkContextFactory.create("SlowWave");
+			
+			Map<String, Object> properties = new HashMap<>();
+			properties.put("layers.input.size", 256);
+			properties.put("layers.output.size", 10);
+			properties.put("layers.hidden.count", 1);
+			properties.put("layers.hidden[0].size", 32);
+			
+			network = context.createNeuralNetwork(double[].class, double[].class, properties);
 		}
 		else{
 			System.out.println("Loading neural-networks from file...");
 			try(ObjectInputStream input =
 					new ObjectInputStream(new FileInputStream(comparatorData))){
-				network = (NeuralNetwork)input.readObject();
+				network = (NeuralNetwork<double[], double[]>)input.readObject();
 			}
 		}
 		
@@ -112,17 +122,17 @@ public class DigitRecognition{
 	private final ZipFile dataSet;
 	private Map<double[], double[]> data;
 	
-	private NeuralNetwork network;
+	private NeuralNetwork<double[], double[]> network;
 	
 	
-	public DigitRecognition(ZipFile dataSet, NeuralNetwork network){
+	public DigitRecognition(ZipFile dataSet, NeuralNetwork<double[], double[]> network){
 		this.dataSet = dataSet;
 		
 		this.network = network;
 	}
 	
 	
-	public void train(DoubleFunction<Boolean> completed){
+	public void train(Predicate<Double> completed){
 		if(this.data == null){
 			Map<Byte, BufferedImage> images = new HashMap<>();
 			
@@ -155,7 +165,14 @@ public class DigitRecognition{
 		}
 		
 		try{
-			NeuralNetworkTraining.train(this.network, this.data, completed);
+			BiFunction<double[], double[], Double> errorCalculator = (o, e) -> {
+				double error = 0;
+				for(int i = 0; i < o.length; i++)
+					error += Math.abs(o[i] - e[i]);
+				return error / o.length;
+			};
+			
+			NeuralNetworkTraining.train(this.network, this.data, errorCalculator, completed);
 		}
 		catch(IOException e){
 			throw new RuntimeException(e);
