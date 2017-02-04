@@ -74,8 +74,10 @@ public class DigitRecognition{
 			Map<String, Object> properties = new HashMap<>();
 			properties.put("layers.input.size", INPUT_SIZE);
 			properties.put("layers.output.size", 10);
-			properties.put("layers.hidden.count", 1);
-			properties.put("layers.hidden[0].size", 32);
+			properties.put("layers.hidden.count", 2);
+			properties.put("layers.hidden[0].size", 128);
+			properties.put("layers.hidden[1].size", 128); // probably unnecessary, one hidden layer with 128 neurons works too
+			                                              // but this seams to learn faster and better
 			
 			network = context.createNeuralNetwork(double[].class, double[].class, properties);
 		}
@@ -97,7 +99,7 @@ public class DigitRecognition{
 		System.out.println("Starting training...");
 		executor.execute(
 			() -> recognition.train(e -> {
-				if(index.getAndIncrement() % 100 == 0)
+				if(index.getAndIncrement() % 10 == 0)
 					System.out.println(e);
 				return interrupt.get();
 			})
@@ -166,7 +168,9 @@ public class DigitRecognition{
 					if(entry.isDirectory() == false){
 						String name =
 							entry.getName().substring(0, entry.getName().indexOf('/'));
-						images.add(new SimpleEntry<>(Byte.valueOf(name), ImageIO.read(dataSet.getInputStream(entry))));
+						images.add(
+							new SimpleEntry<>(Byte.valueOf(name), ImageIO.read(this.dataSet.getInputStream(entry)))
+						);
 					}
 				}
 			}
