@@ -61,6 +61,6 @@ public final class NeuralNetworkTraining{
 				
 				totalError += errorCalculator.apply(output, expectedOutput);
 			}
-		}while(completed.test(totalError) == false);
+		}while(completed.test(totalError / validationSize) == false);
 	}
 }
