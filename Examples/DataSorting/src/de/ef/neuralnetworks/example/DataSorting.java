@@ -45,6 +45,11 @@ import de.ef.slowwave.pipeline.image.SlowWaveForegroundObjectExtractor;
  * possibility to fail. Maybe some data formats work better then others,
  * but binary images of handwritten digits do not seam to work at all.
  * </p>
+ * <p>
+ * <u>Update:</u> There could be hope, with a different configuration of
+ * learning rate and hidden layer size/count it seams to make progress while
+ * learning.
+ * </p>
  * 
  * @author Erik Fritzsche
  */
@@ -73,8 +78,9 @@ public class DataSorting{
 			Map<String, Object> properties = new HashMap<>();
 			properties.put("layers.input.size", INPUT_SIZE);
 			properties.put("layers.output.size", 1);
-			properties.put("layers.hidden.count", 1);
-			properties.put("layers.hidden[0].size", 32);
+			properties.put("layers.hidden.count", 2);
+			properties.put("layers.hidden[0].size", 128);
+			properties.put("layers.hidden[1].size", 128);
 			
 			equal = context.createNeuralNetwork(double[].class, double[].class, properties);
 			compare = context.createNeuralNetwork(double[].class, double[].class, properties);
@@ -177,7 +183,9 @@ public class DataSorting{
 					if(entry.isDirectory() == false){
 						String name =
 							entry.getName().substring(0, entry.getName().indexOf('/'));
-						images.add(new SimpleEntry<>(Byte.valueOf(name), ImageIO.read(dataSet.getInputStream(entry))));
+						images.add(
+							new SimpleEntry<>(Byte.valueOf(name), ImageIO.read(this.dataSet.getInputStream(entry)))
+						);
 					}
 				}
 			}
