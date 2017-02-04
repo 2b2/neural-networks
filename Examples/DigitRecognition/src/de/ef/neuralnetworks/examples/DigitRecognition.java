@@ -67,7 +67,7 @@ public class DigitRecognition{
 		
 		File networkData = new File("./comp.dat");
 		if(networkData.exists() == false){
-			System.out.println("Creating new neural-networks...");
+			System.out.println("Creating new neural-network...");
 			Class.forName("de.ef.slowwave.SlowWaveContext");
 			NeuralNetworkContext context = NeuralNetworkContextFactory.create("SlowWave");
 			
@@ -82,7 +82,7 @@ public class DigitRecognition{
 			network = context.createNeuralNetwork(double[].class, double[].class, properties);
 		}
 		else{
-			System.out.println("Loading neural-networks from file...");
+			System.out.println("Loading neural-network from file...");
 			try(ObjectInputStream input =
 					new ObjectInputStream(new FileInputStream(networkData))){
 				network = (NeuralNetwork<double[], double[]>)input.readObject();
@@ -110,9 +110,9 @@ public class DigitRecognition{
 		System.in.read();
 		interrupt.set(true);
 		
-		// after training finished start next task and save neural-networks to disk
+		// after training finished start next task and save neural-network to disk
 		executor.execute(() -> {
-			System.out.println("Saving neural-networks...");
+			System.out.println("Saving neural-network...");
 			try(ObjectOutputStream output =
 					new ObjectOutputStream(new FileOutputStream(networkData))){
 				output.writeObject(network);
