@@ -1,6 +1,5 @@
 package de.ef.neuralnetworks.examples;
 
-import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
@@ -9,8 +8,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
@@ -27,11 +29,17 @@ import javax.imageio.ImageIO;
 import de.ef.neuralnetworks.NeuralNetwork;
 import de.ef.neuralnetworks.NeuralNetworkContext;
 import de.ef.neuralnetworks.NeuralNetworkContextFactory;
+import de.ef.neuralnetworks.pipeline.Pipeline;
+import de.ef.neuralnetworks.pipeline.PipelineBuilder;
+import de.ef.neuralnetworks.pipeline.image.GrayscaleImageConverter;
 import de.ef.neuralnetworks.util.NeuralNetworkTraining;
-import de.ef.neuralnetworks.util.image.MonochromeImageData;
+import de.ef.slowwave.pipeline.ByteArrayBufferFactory;
+import de.ef.slowwave.pipeline.ByteArrayBufferFactory.FixedByteArrayBufferFactory;
+import de.ef.slowwave.pipeline.image.SlowWaveForegroundObjectExtractor;
 
 public class DigitRecognition{
 	
+	private final static int INPUT_WIDTH = 32, INPUT_HEIGHT = 32, INPUT_SIZE = INPUT_WIDTH * INPUT_HEIGHT;
 	private final static double OUTPUTS[][] = {
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		{0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -57,14 +65,14 @@ public class DigitRecognition{
 		
 		NeuralNetwork<double[], double[]> network;
 		
-		File comparatorData = new File("./comp.dat");
-		if(comparatorData.exists() == false){
+		File networkData = new File("./comp.dat");
+		if(networkData.exists() == false){
 			System.out.println("Creating new neural-networks...");
 			Class.forName("de.ef.slowwave.SlowWaveContext");
 			NeuralNetworkContext context = NeuralNetworkContextFactory.create("SlowWave");
 			
 			Map<String, Object> properties = new HashMap<>();
-			properties.put("layers.input.size", 256);
+			properties.put("layers.input.size", INPUT_SIZE);
 			properties.put("layers.output.size", 10);
 			properties.put("layers.hidden.count", 1);
 			properties.put("layers.hidden[0].size", 32);
@@ -74,7 +82,7 @@ public class DigitRecognition{
 		else{
 			System.out.println("Loading neural-networks from file...");
 			try(ObjectInputStream input =
-					new ObjectInputStream(new FileInputStream(comparatorData))){
+					new ObjectInputStream(new FileInputStream(networkData))){
 				network = (NeuralNetwork<double[], double[]>)input.readObject();
 			}
 		}
@@ -101,12 +109,11 @@ public class DigitRecognition{
 		interrupt.set(true);
 		
 		// after training finished start next task and save neural-networks to disk
-		/*executor.execute(() -> {
+		executor.execute(() -> {
 			System.out.println("Saving neural-networks...");
 			try(ObjectOutputStream output =
-					new ObjectOutputStream(new FileOutputStream(comparatorData))){
-				output.writeObject(equal);
-				output.writeObject(compare);
+					new ObjectOutputStream(new FileOutputStream(networkData))){
+				output.writeObject(network);
 			}
 			catch(Throwable t){
 				t.printStackTrace();
@@ -114,27 +121,42 @@ public class DigitRecognition{
 			}
 			System.out.println("Finished!");
 			System.exit(0);
-		});*/
+		});
 	}
 	
 	
 	
 	private final ZipFile dataSet;
-	private Map<double[], double[]> data;
+	private List<Entry<double[], double[]>> data;
 	
 	private NeuralNetwork<double[], double[]> network;
+	private Pipeline<BufferedImage, double[]> inputPipeline;
 	
 	
 	public DigitRecognition(ZipFile dataSet, NeuralNetwork<double[], double[]> network){
 		this.dataSet = dataSet;
 		
 		this.network = network;
+		this.inputPipeline =
+			new PipelineBuilder<BufferedImage, double[]>()
+			.root(
+				GrayscaleImageConverter.fromBufferedImage(new ByteArrayBufferFactory(1), false)
+			)
+			.pipe(
+				new SlowWaveForegroundObjectExtractor(
+					INPUT_WIDTH, INPUT_HEIGHT, 127, new FixedByteArrayBufferFactory(INPUT_SIZE, 1)
+				)
+			)
+			.exit(
+				GrayscaleImageConverter.toDoubleArray((s, c) -> new double[s])
+			)
+			.build();
 	}
 	
 	
 	public void train(Predicate<Double> completed){
 		if(this.data == null){
-			Map<Byte, BufferedImage> images = new HashMap<>();
+			List<Entry<Byte, BufferedImage>> images = new ArrayList<>();
 			
 			try{
 				Enumeration<? extends ZipEntry> entries = dataSet.entries();
@@ -144,7 +166,7 @@ public class DigitRecognition{
 					if(entry.isDirectory() == false){
 						String name =
 							entry.getName().substring(0, entry.getName().indexOf('/'));
-						images.put(Byte.valueOf(name), ImageIO.read(dataSet.getInputStream(entry)));
+						images.add(new SimpleEntry<>(Byte.valueOf(name), ImageIO.read(dataSet.getInputStream(entry))));
 					}
 				}
 			}
@@ -152,12 +174,12 @@ public class DigitRecognition{
 				throw new RuntimeException(e);
 			}
 			
-			Map<double[], double[]> data = new HashMap<>();
-			for(Entry<Byte, BufferedImage> image : images.entrySet()){
-				data.put(
-					new MonochromeImageData(image.getValue(), Color.WHITE.getRGB(), 16, 16, true)
-						.getData(),
-					DigitRecognition.OUTPUTS[image.getKey()]
+			List<Entry<double[], double[]>> data = new ArrayList<>();
+			for(Entry<Byte, BufferedImage> image : images){
+				data.add(
+					new SimpleEntry<>(
+						this.inputPipeline.process(image.getValue()), DigitRecognition.OUTPUTS[image.getKey()]
+					)
 				);
 			}
 			

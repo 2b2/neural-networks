@@ -14,7 +14,8 @@ import org.junit.Test;
 
 import de.ef.neuralnetworks.NeuralNetwork;
 import de.ef.neuralnetworks.NeuralNetworkComparator;
-import de.ef.neuralnetworks.NeuralNetworkFactory;
+import de.ef.neuralnetworks.NeuralNetworkContext;
+import de.ef.neuralnetworks.NeuralNetworkContextFactory;
 
 public class ComparatorTest{
 	
@@ -22,11 +23,18 @@ public class ComparatorTest{
 	
 	
 	@Test
-	public void test() throws IOException{
-		String config = "{\"implementation\": \"SlowWave\", \"layers\": [2, 3, 1]}";
-
-		NeuralNetwork<double[], Float> same = NeuralNetworkFactory.create(config);
-		NeuralNetwork<double[], Float> compare = NeuralNetworkFactory.create(config);
+	public void test() throws IOException, ClassNotFoundException{
+		Class.forName("de.ef.slowwave.SlowWaveContext");
+		NeuralNetworkContext context = NeuralNetworkContextFactory.create("SlowWave");
+		
+		Map<String, Object> properties = new HashMap<>();
+		properties.put("layers.input.size", 2);
+		properties.put("layers.output.size", 1);
+		properties.put("layers.hidden.count", 1);
+		properties.put("layers.hidden[0].size", 3);
+		
+		NeuralNetwork<double[], Float> same = context.createNeuralNetwork(double[].class, Float.class, properties);
+		NeuralNetwork<double[], Float> compare = context.createNeuralNetwork(double[].class, Float.class, properties);
 		
 		if(same == null || compare == null)
 			Assert.fail("The returned network is null.");
