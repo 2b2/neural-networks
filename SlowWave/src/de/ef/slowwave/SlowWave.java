@@ -32,7 +32,7 @@ public class SlowWave // FIXME make generic
 	/**
 	 * The default learning rate for the used backpropagation training algorithm.
 	 */
-	public final static double DEFAULT_LEARNING_RATE = 1.0;
+	public final static double DEFAULT_LEARNING_RATE = 0.1;
 	
 	
 	
