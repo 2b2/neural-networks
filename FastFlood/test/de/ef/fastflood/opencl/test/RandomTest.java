@@ -52,7 +52,7 @@ public class RandomTest{
 		cl_mem arrayObject = clCreateBuffer(context, CL_MEM_READ_WRITE, Sizeof.cl_float * array.length, null, null);
 		
 		clSetKernelArg(kernel, 0, Sizeof.cl_mem, Pointer.to(arrayObject));
-		clSetKernelArg(kernel, 1, Sizeof.cl_int, Pointer.to(new int[]{}));
+		clSetKernelArg(kernel, 1, Sizeof.cl_int, Pointer.to(new int[]{(int)(Math.random() * Integer.MAX_VALUE)}));
 		clEnqueueNDRangeKernel(commandQueue, kernel, 1, null, new long[]{array.length}, new long[]{1}, 0, null, null);
 		clFinish(commandQueue);
 		
