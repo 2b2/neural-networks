@@ -4,13 +4,16 @@ import java.io.IOException;
 
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
+import org.jocl.cl_command_queue;
 import org.jocl.cl_context;
+import org.jocl.cl_context_properties;
 import org.jocl.cl_device_id;
 import org.jocl.cl_kernel;
 import org.jocl.cl_mem;
 import org.jocl.cl_program;
 
 import de.ef.fastflood.FastFlood;
+import de.ef.fastflood.opencl.FastFloodOpenCLContext.OpenCLConfiguration;
 
 import static org.jocl.CL.*;
 
@@ -32,18 +35,23 @@ public class FastFloodOpenCL
 	
 	
 	private final cl_context context;
-	private final cl_device_id device;
+	private final cl_command_queue commandQueue;
 	private final Pointer pointers[];
 	private final cl_mem memory[];
 	private final cl_program program;
 	private final cl_kernel kernel;
 	
 	
-	FastFloodOpenCL(int inputSize, int hiddenSizes[], int outputSize, cl_context context, cl_device_id device){
+	@SuppressWarnings("deprecation")
+	FastFloodOpenCL(int inputSize, int hiddenSizes[], int outputSize, OpenCLConfiguration config){
 		super(inputSize, hiddenSizes, outputSize);
 		
-		this.context = context;
-		this.device = device;
+		cl_context_properties contextProperties = new cl_context_properties();
+		contextProperties.addProperty(CL_CONTEXT_PLATFORM, config.platform);
+		this.context = clCreateContext(contextProperties, 1, new cl_device_id[]{config.device}, null, null, null);
+		// using old command queue to support OpenCL 1.2
+		this.commandQueue = clCreateCommandQueue(context, config.device, 0, null);
+		//this.commandQueue = clCreateCommandQueueWithProperties(context, device, null, null);
 		
 		this.pointers = new Pointer[3];
 		this.pointers[INPUTS_INDEX] = Pointer.to(this.inputs);
@@ -87,9 +95,7 @@ public class FastFloodOpenCL
 			null
 		);
 		
-		
-		this.program = clCreateProgramWithSource(context, 1, new String[]{/* TODO kernel source */}, null, null);
-		clBuildProgram(this.program, 0, null, null, null, null);
+		this.program = ProgramBuilder.loadAndBuildProgram(context, config.device, "/fast-flood.cl", true);
 		
 		this.kernel = clCreateKernel(program, "TODO", null);
 		// set kernel arguments, reverse order
@@ -149,6 +155,7 @@ public class FastFloodOpenCL
 		}
 		clReleaseKernel(kernel);
 		clReleaseProgram(program);
+		clReleaseCommandQueue(commandQueue);
 		clReleaseContext(context);
 	}
 }
