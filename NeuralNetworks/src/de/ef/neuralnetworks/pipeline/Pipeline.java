@@ -35,7 +35,6 @@ public class Pipeline<I, O>{
 		private final Function<Object, Object> function;
 		private final Part next;
 		
-		
 		public Part(Function<Object, Object> function, Part next){
 			this.function = function;
 			this.next = next;
