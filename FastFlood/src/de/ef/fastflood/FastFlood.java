@@ -45,10 +45,10 @@ public abstract class FastFlood
 		
 		neuronCounts[0] = inputSize;
 		layerOffsets[0] = 0;
-		for(int i = 1; i < hiddenSizes.length; i++){
-			neuronCounts[i] = hiddenSizes[i];
+		for(int i = 0; i < hiddenSizes.length; i++){
+			neuronCounts[i + 1] = hiddenSizes[i];
 			// layer offset current total neuron count
-			layerOffsets[i] = totalNeuronCount;
+			layerOffsets[i + 1] = totalNeuronCount;
 			totalNeuronCount += hiddenSizes[i];
 			// plus one for bias neuron
 			totalWeightCount += hiddenSizes[i] * (lastNeuronCount + 1);
