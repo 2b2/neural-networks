@@ -29,16 +29,17 @@ public class FastFloodOpenCL
 	private final static long serialVersionUID = 002_000_000L;
 	
 	private final static int
-		INPUTS_INDEX = 0, OUTPUTS_INDEX = 1, WEIGHTS_INDEX = 2,
-		NEURON_COUNTS_INDEX = 3, NEURON_OFFSETS_INDEX = 4,
-		CURRENT_LAYER_INDEX = 5;
+		INPUTS_INDEX = 0, OUTPUTS_INDEX = 1,
+		NEURONS_INDEX = 0, WEIGHTS_INDEX = 1,
+		NEURON_COUNTS_INDEX = 2, NEURON_OFFSETS_INDEX = 3,
+		CURRENT_LAYER_INDEX = 4;
 	
 	
 	
 	private final cl_context context;
 	private final cl_command_queue commandQueue;
 	private final Pointer pointers[];
-	private final int inputByteSize, outputByteSize;
+	private final int inputByteSize, outputByteSize, outputByteOffset;
 	private final cl_mem memory[];
 	private final cl_program program;
 	private final cl_kernel calculatdeLayerKernel, trainLayerKernel, randomFloatArrayKernel;
@@ -61,16 +62,14 @@ public class FastFloodOpenCL
 		
 		inputByteSize = Sizeof.cl_float * inputs.length;
 		outputByteSize = Sizeof.cl_float * outputs.length;
+		outputByteOffset = Sizeof.cl_float * (neuronOffsets.length - outputs.length);
 		
-		memory = new cl_mem[5];
-		memory[INPUTS_INDEX] = clCreateBuffer(
-			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, inputByteSize, pointers[INPUTS_INDEX], null
-		);
-		memory[OUTPUTS_INDEX] = clCreateBuffer(
-			context, CL_MEM_READ_WRITE, outputByteSize, pointers[OUTPUTS_INDEX], null
+		memory = new cl_mem[4];
+		memory[NEURONS_INDEX] = clCreateBuffer(
+			context, CL_MEM_READ_WRITE, Sizeof.cl_float * neuronOffsets.length, null, null
 		);
 		memory[WEIGHTS_INDEX] = clCreateBuffer(
-			context, CL_MEM_READ_WRITE, Sizeof.cl_float * weightCount, pointers[WEIGHTS_INDEX], null
+			context, CL_MEM_READ_WRITE, Sizeof.cl_float * weightCount, null, null
 		);
 		memory[NEURON_COUNTS_INDEX] = clCreateBuffer(
 			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, Sizeof.cl_int * neuronCounts.length, Pointer.to(neuronCounts), null
@@ -132,7 +131,7 @@ public class FastFloodOpenCL
 	@Override
 	protected void readOutputs() throws IOException{
 		clEnqueueReadBuffer(
-			commandQueue, memory[OUTPUTS_INDEX], CL_TRUE, 0, outputByteSize, pointers[OUTPUTS_INDEX], 0, null, null
+			commandQueue, memory[OUTPUTS_INDEX], CL_TRUE, outputByteOffset, outputByteSize, pointers[OUTPUTS_INDEX], 0, null, null
 		);
 	}
 	
