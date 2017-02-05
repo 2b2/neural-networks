@@ -1,10 +1,11 @@
-package de.ef.fastflood.opencl;
+package de.ef.fastflood.opencl.test;
 
 import java.util.List;
 
 import org.junit.Assert;
 import org.junit.Test;
 
+import de.ef.fastflood.opencl.FastFloodOpenCLContext;
 import de.ef.fastflood.opencl.FastFloodOpenCLContext.OpenCLConfiguration;
 
 public class DeviceListTest{
