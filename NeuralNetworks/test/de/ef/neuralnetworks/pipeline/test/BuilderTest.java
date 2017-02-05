@@ -14,16 +14,20 @@ public class BuilderTest{
 	@Test
 	public void test(){
 		Pipeline<Integer, Boolean> pipeline =
+			new PipelineBuilder<Integer, Boolean>().singleFunction(i -> i > 0).build();
+		
+		if(pipeline.process(1) != true) Assert.fail("Single pipeline not working.");
+		
+		pipeline =
 			new PipelineBuilder<Integer, Boolean>()
-			.root(i -> (float)i)
-				.pipe(f -> f < 0.5 ? true : false)
-				.exit(b -> b == false)
+			.root(i -> (double)i)
+			.branch(d -> d.floatValue(), f -> f > 1, new PipelineBuilder<Float, Boolean>().singleFunction(f -> false))
+			.pipe(f -> f < 0.5 ? true : false)
+			.exit(b -> b == false)
 			.build();
 		
-		if(pipeline.process(1) != true) Assert.fail();
+		if(pipeline.process(1) != true) Assert.fail("Basic pipeline not working.");
 		
-		pipeline = new PipelineBuilder<Integer, Boolean>().singleFunction(i -> i > 0).build();
-		
-		if(pipeline.process(1) != true) Assert.fail();
+		if(pipeline.process(2) != false) Assert.fail("Branching pipeline not working.");
 	}
 }
