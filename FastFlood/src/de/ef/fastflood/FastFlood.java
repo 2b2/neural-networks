@@ -32,25 +32,30 @@ public abstract class FastFlood
 	
 	
 	
-	protected final int neuronCounts[], neuronOffsets[], weightCount;
+	protected final int neuronCounts[], layerOffsets[], neuronOffsets[], weightCount;
 	protected final float inputs[], outputs[];
 	
 	
 	protected FastFlood(int inputSize, int hiddenSizes[], int outputSize){
 		neuronCounts = new int[2 + hiddenSizes.length];
+		layerOffsets = new int[2 + hiddenSizes.length];
 		
 		int lastNeuronCount = inputSize;
 		int totalNeuronCount = inputSize, totalWeightCount = 0;
 		
 		neuronCounts[0] = inputSize;
+		layerOffsets[0] = 0;
 		for(int i = 1; i < hiddenSizes.length; i++){
 			neuronCounts[i] = hiddenSizes[i];
+			// layer offset current total neuron count
+			layerOffsets[i] = totalNeuronCount;
 			totalNeuronCount += hiddenSizes[i];
 			// plus one for bias neuron
 			totalWeightCount += hiddenSizes[i] * (lastNeuronCount + 1);
 			lastNeuronCount = hiddenSizes[i];
 		}
 		neuronCounts[neuronCounts.length - 1] = outputSize;
+		layerOffsets[neuronCounts.length - 1] = totalNeuronCount;
 		totalNeuronCount += outputSize;
 		totalWeightCount += outputSize * (lastNeuronCount + 1);
 		
@@ -62,7 +67,7 @@ public abstract class FastFlood
 		// now init the neuron offsets
 		neuronOffsets = new int[totalNeuronCount];
 		
-		// first off set is zero
+		// first offset is zero
 		neuronOffsets[0] = 0;
 		// loop through each neuron, skip input layer because every neuron has zero weights
 		for(int i = 1, index = 0, layer = 1; i < totalNeuronCount; i++, index++){
