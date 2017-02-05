@@ -31,8 +31,8 @@ public class FastFloodOpenCL
 	private final static int
 		INPUTS_INDEX = 0, OUTPUTS_INDEX = 1,
 		NEURONS_INDEX = 0, WEIGHTS_INDEX = 1,
-		NEURON_COUNTS_INDEX = 2, NEURON_OFFSETS_INDEX = 3,
-		CURRENT_LAYER_INDEX = 4;
+		NEURON_COUNTS_INDEX = 2, LAYER_OFFSETS_INDEX = 3, NEURON_OFFSETS_INDEX = 4,
+		CURRENT_LAYER_INDEX = 5;
 	
 	
 	
@@ -64,7 +64,7 @@ public class FastFloodOpenCL
 		outputByteSize = Sizeof.cl_float * outputs.length;
 		outputByteOffset = Sizeof.cl_float * (inputs.length + (neuronOffsets.length - outputs.length));
 		
-		memory = new cl_mem[4];
+		memory = new cl_mem[5];
 		memory[NEURONS_INDEX] = clCreateBuffer(
 			context, CL_MEM_READ_WRITE, Sizeof.cl_float * (inputs.length + neuronOffsets.length), null, null
 		);
@@ -73,6 +73,9 @@ public class FastFloodOpenCL
 		);
 		memory[NEURON_COUNTS_INDEX] = clCreateBuffer(
 			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, Sizeof.cl_int * neuronCounts.length, Pointer.to(neuronCounts), null
+		);
+		memory[LAYER_OFFSETS_INDEX] = clCreateBuffer(
+			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, Sizeof.cl_int * layerOffsets.length, Pointer.to(layerOffsets), null
 		);
 		memory[NEURON_OFFSETS_INDEX] = clCreateBuffer(
 			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, Sizeof.cl_int * neuronOffsets.length, Pointer.to(neuronOffsets), null
