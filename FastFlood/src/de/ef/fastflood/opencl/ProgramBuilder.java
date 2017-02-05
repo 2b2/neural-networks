@@ -17,13 +17,13 @@ import org.jocl.cl_program;
 
 import static org.jocl.CL.*;
 
-class ProgramBuilder{
+public final class ProgramBuilder{
 	
 	private ProgramBuilder(){}
 	
 	
 	
-	static cl_program loadAndBuildProgram(cl_context context, cl_device_id device, String file, boolean cache){
+	public static cl_program loadAndBuildProgram(cl_context context, cl_device_id device, String file, boolean cache){
 		try{
 			String deviceName =
 				FastFloodOpenCLContext
