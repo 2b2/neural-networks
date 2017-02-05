@@ -65,12 +65,12 @@ public abstract class FastFlood
 		weightCount = totalWeightCount;
 		
 		// now init the neuron offsets
-		neuronOffsets = new int[totalNeuronCount];
+		neuronOffsets = new int[totalNeuronCount - inputSize];
 		
 		// first offset is zero
 		neuronOffsets[0] = 0;
 		// loop through each neuron, skip input layer because every neuron has zero weights
-		for(int i = 1, index = 0, layer = 1; i < totalNeuronCount; i++, index++){
+		for(int i = 1, index = 0, layer = 1; i < neuronOffsets.length; i++, index++){
 			// neuron offset is last offset plus last layer length plus one for the bias weight
 			neuronOffsets[i] = neuronOffsets[i - 1] + neuronCounts[layer - 1] + 1;
 			if(index == neuronCounts[layer]){
