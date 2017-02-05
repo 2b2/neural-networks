@@ -32,8 +32,8 @@ public abstract class FastFlood
 	
 	
 	
-	protected final int neuronCounts[], neuronOffsets[];
-	protected final float inputs[], outputs[], weights[];
+	protected final int neuronCounts[], neuronOffsets[], weightCount;
+	protected final float inputs[], outputs[];
 	
 	
 	protected FastFlood(int inputSize, int hiddenSizes[], int outputSize){
@@ -57,7 +57,7 @@ public abstract class FastFlood
 		// init the inputs, outputs and weights arrays
 		inputs = new float[neuronCounts[0]];
 		outputs = new float[neuronCounts[neuronCounts.length - 1]];
-		weights = new float[totalWeightCount];
+		weightCount = totalWeightCount;
 		
 		// now init the neuron offsets
 		neuronOffsets = new int[totalNeuronCount];
@@ -72,11 +72,6 @@ public abstract class FastFlood
 				layer++;
 				index = 0;
 			}
-		}
-		
-		for(int i = 0; i < weights.length; i++){
-			// (1 - (Math.random() * 2)) element [-1; 1[
-			weights[i] = (float)(1 - (Math.random() * 2));
 		}
 	}
 	
