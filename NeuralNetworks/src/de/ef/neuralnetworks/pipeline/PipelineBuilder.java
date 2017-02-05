@@ -1,58 +1,71 @@
 package de.ef.neuralnetworks.pipeline;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Function;
+import java.util.function.Predicate;
+
+import de.ef.neuralnetworks.pipeline.Pipeline.Branch;
+import de.ef.neuralnetworks.pipeline.Pipeline.Part;
 
 public class PipelineBuilder<I, O>{
 	
-	private Pipe<I, ?> root = null;
+	private boolean hasRoot = false;
 	private Pipe<?, ?> exit = null;
-	private int count = 0;
 	
 	
 	public PipelineBuilder(){}
 	
 	
 	public <R> Pipe<I, R> root(Function<I, R> function){
-		if(this.root != null)
+		if(this.hasRoot == true)
 			throw new IllegalStateException("Root pipe already set.");
 		
-		Pipe<I, R> root = new Pipe<>(function);
-		this.root = root;
-		return root;
+		this.hasRoot = true;
+		return new Pipe<>(function, null);
 	}
 	
 	public PipelineBuilder<I, O> singleFunction(Function<I, O> function){
-		if(this.root != null)
+		if(this.hasRoot == true)
 			throw new IllegalStateException("Root pipe already set.");
 		
-		this.root = new ExitPipe<>(function);
+		this.hasRoot = true;
+		new ExitPipe<>(function, null);
 		return this;
 	}
 	
-	
 	public Pipe<?, ?> last(){
+		if(this.exit instanceof ExitPipe)
+			throw new IllegalStateException("Can not create anything after exit.");
+		
 		return this.exit;
 	}
 	
-	@SuppressWarnings("unchecked")
+	
 	public Pipeline<I, O> build(){
-		if(this.root == null)
+		if(this.hasRoot == false)
 			throw new IllegalStateException("Root pipe not set.");
 		
 		if(this.exit instanceof ExitPipe == false)
 			throw new IllegalStateException("Bad exit pipe.");
 		
-		List<Function<Object, Object>> steps = new ArrayList<>(this.count);
-		Pipe<?, ?> current = this.root;
-		do{
-			steps.add((Function<Object, Object>)current.function);
+		return new Pipeline<>(this.buildPart());
+	}
+	
+	@SuppressWarnings("unchecked")
+	private Part buildPart(){
+		// going backwards from exit to start
+		Pipe<Object, Object> pipe = (Pipe<Object, Object>)this.exit;
+		Part part = null;
+		while(pipe != null){
+			if(pipe instanceof BranchPipe){
+				BranchPipe<Object, Object> branchPipe = (BranchPipe<Object, Object>)pipe;
+				part = new Branch(pipe.function, branchPipe.branchOff, part, branchPipe.branch.buildPart());
+			}
+			else part = new Part(pipe.function, part);
 			
-			current = current.next;
-		}while(current != null);
+			pipe = (Pipe<Object, Object>)pipe.last;
+		}
 		
-		return new Pipeline<>(steps);
+		return part;
 	}
 	
 	
@@ -60,46 +73,51 @@ public class PipelineBuilder<I, O>{
 	public class Pipe<I2, O2>{
 		
 		private final Function<I2, O2> function;
+		private final Pipe<?, ?> last;
 		
-		private Pipe<O2, ?> next;
 		
-		
-		private Pipe(Function<I2, O2> function){
+		private Pipe(Function<I2, O2> function, Pipe<?, ?> last){
 			this.function = function;
+			this.last = last;
 			
 			PipelineBuilder.this.exit = this;
-			PipelineBuilder.this.count++;
 		}
 		
 		
 		public <R> Pipe<O2, R> pipe(Function<O2, R> function){
-			Pipe<O2, R> next = new Pipe<>(function);
-			this.next = next;
-			return next;
+			return new Pipe<>(function, this);
+		}
+		
+		public <R> Pipe<O2, R> branch(Function<O2, R> function, Predicate<R> branchOff, PipelineBuilder<R, O> branch){
+			return new BranchPipe<>(function, this, branchOff, branch);
 		}
 		
 		public PipelineBuilder<I, O> exit(Function<O2, O> function){
-			this.next = new ExitPipe<>(function);
+			new ExitPipe<>(function, this);
 			return PipelineBuilder.this;
+		}
+	}
+	
+	private class BranchPipe<I2, O2>
+		extends Pipe<I2, O2>{
+		
+		private final Predicate<O2> branchOff;
+		private final PipelineBuilder<O2, O> branch;
+		
+		
+		private BranchPipe(Function<I2, O2> function, Pipe<?, ?> last, Predicate<O2> branchOff, PipelineBuilder<O2, O> branch){
+			super(function, last);
+			
+			this.branchOff = branchOff;
+			this.branch = branch;
 		}
 	}
 	
 	private class ExitPipe<I2>
 		extends Pipe<I2, O>{
 		
-		private ExitPipe(Function<I2, O> function){
-			super(function);
-		}
-		
-		
-		@Override
-		public <R> Pipe<O, R> pipe(Function<O, R> function){
-			throw new IllegalStateException("Can not create pipe after exit pipe.");
-		}
-		
-		@Override
-		public PipelineBuilder<I, O> exit(Function<O, O> function){
-			throw new IllegalStateException("Can not create exit pipe after exit pipe.");
+		private ExitPipe(Function<I2, O> function, Pipe<?, ?> last){
+			super(function, last);
 		}
 	}
 }
