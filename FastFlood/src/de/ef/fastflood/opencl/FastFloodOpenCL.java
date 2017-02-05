@@ -1,7 +1,5 @@
 package de.ef.fastflood.opencl;
 
-import static org.jocl.CL.*;
-
 import java.io.IOException;
 
 import org.jocl.Pointer;
@@ -14,16 +12,18 @@ import org.jocl.cl_program;
 
 import de.ef.fastflood.FastFlood;
 
+import static org.jocl.CL.*;
+
 // TODO comment
 // native neural network implementation using OpenCL via the java wrapper JOCL
-// version: 1.1, date: 16.06.2016, author: Erik Fritzsche
+// version: 2, date: 16.06.2016, author: Erik Fritzsche
 public class FastFloodOpenCL
 	extends FastFlood{
 	
 	/**
 	 * Make always same as @version in JavaDoc in format xxx.yyy.zzz
 	 */
-	private final static long serialVersionUID = 001_000_000L;
+	private final static long serialVersionUID = 002_000_000L;
 	
 	private final static int
 		NEURON_COUNTS_INDEX = 4, NEURON_OFFSETS_INDEX = 3,
@@ -106,14 +106,20 @@ public class FastFloodOpenCL
 	
 	
 	@Override
+	protected void trainLayer(int layer) throws IOException{
+		
+	}
+	
+	
+	@Override
 	protected void writeInputs() throws IOException{
 		clEnqueueWriteBuffer(
 			/* TODO queue */null,
-			this.memory[INPUTS_INDEX],
+			memory[INPUTS_INDEX],
 			CL_TRUE,
 			0,
-			this.outputs.length * Sizeof.cl_float,
-			this.pointers[INPUTS_INDEX],
+			outputs.length * Sizeof.cl_float,
+			pointers[INPUTS_INDEX],
 			0,
 			null,
 			null
@@ -124,11 +130,11 @@ public class FastFloodOpenCL
 	protected void readOutputs() throws IOException{
 		clEnqueueReadBuffer(
 			/* TODO queue */null,
-			this.memory[OUTPUTS_INDEX],
+			memory[OUTPUTS_INDEX],
 			CL_TRUE,
 			0,
-			this.outputs.length * Sizeof.cl_float,
-			this.pointers[OUTPUTS_INDEX],
+			outputs.length * Sizeof.cl_float,
+			pointers[OUTPUTS_INDEX],
 			0,
 			null,
 			null
@@ -138,11 +144,11 @@ public class FastFloodOpenCL
 	
 	@Override
 	public void close() throws IOException{
-		for(int i = 0; i < this.memory.length; i++){
-			clReleaseMemObject(this.memory[i]);
+		for(int i = 0; i < memory.length; i++){
+			clReleaseMemObject(memory[i]);
 		}
-		clReleaseKernel(this.kernel);
-		clReleaseProgram(this.program);
-		clReleaseContext(this.context);
+		clReleaseKernel(kernel);
+		clReleaseProgram(program);
+		clReleaseContext(context);
 	}
 }
