@@ -62,11 +62,11 @@ public class FastFloodOpenCL
 		
 		inputByteSize = Sizeof.cl_float * inputs.length;
 		outputByteSize = Sizeof.cl_float * outputs.length;
-		outputByteOffset = Sizeof.cl_float * (neuronOffsets.length - outputs.length);
+		outputByteOffset = Sizeof.cl_float * (inputs.length + (neuronOffsets.length - outputs.length));
 		
 		memory = new cl_mem[4];
 		memory[NEURONS_INDEX] = clCreateBuffer(
-			context, CL_MEM_READ_WRITE, Sizeof.cl_float * neuronOffsets.length, null, null
+			context, CL_MEM_READ_WRITE, Sizeof.cl_float * (inputs.length + neuronOffsets.length), null, null
 		);
 		memory[WEIGHTS_INDEX] = clCreateBuffer(
 			context, CL_MEM_READ_WRITE, Sizeof.cl_float * weightCount, null, null
