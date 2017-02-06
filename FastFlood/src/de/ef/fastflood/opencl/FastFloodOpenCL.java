@@ -30,8 +30,8 @@ public class FastFloodOpenCL
 	
 	private final static int
 		INPUTS_INDEX = 0, OUTPUTS_INDEX = 1,
-		NEURONS_INDEX = 0, WEIGHTS_INDEX = 1,
-		NEURON_COUNTS_INDEX = 2, LAYER_OFFSETS_INDEX = 3, NEURON_OFFSETS_INDEX = 4,
+		NEURONS_INDEX = 1, WEIGHTS_INDEX = 2,
+		LAYER_INFOS_INDEX = 3, NEURON_OFFSETS_INDEX = 4,
 		CURRENT_LAYER_INDEX = 5;
 	
 	
@@ -42,7 +42,9 @@ public class FastFloodOpenCL
 	private final int inputByteSize, outputByteSize, outputByteOffset;
 	private final cl_mem memory[];
 	private final cl_program program;
-	private final cl_kernel calculatdeLayerKernel, trainLayerKernel, randomFloatArrayKernel;
+	private final cl_kernel
+		calculatdeLayerKernel, calculateFirstLayerKernel,
+		trainLayerKernel, randomFloatArrayKernel;
 	
 	
 	@SuppressWarnings("deprecation")
@@ -62,20 +64,26 @@ public class FastFloodOpenCL
 		
 		inputByteSize = Sizeof.cl_float * inputs.length;
 		outputByteSize = Sizeof.cl_float * outputs.length;
-		outputByteOffset = Sizeof.cl_float * (inputs.length + (neuronOffsets.length - outputs.length));
+		outputByteOffset = Sizeof.cl_float * neuronOffsets.length - outputs.length;
 		
 		memory = new cl_mem[5];
+		memory[INPUTS_INDEX] = clCreateBuffer(
+			context, CL_MEM_READ_WRITE, Sizeof.cl_float * layerSizes[0], null, null
+		);
+		// create neuron output buffer with two times the neuron count to also store error for training
 		memory[NEURONS_INDEX] = clCreateBuffer(
-			context, CL_MEM_READ_WRITE, Sizeof.cl_float * (inputs.length + neuronOffsets.length), null, null
+			context, CL_MEM_READ_WRITE, Sizeof.cl_float * neuronOffsets.length * 2, null, null
 		);
 		memory[WEIGHTS_INDEX] = clCreateBuffer(
 			context, CL_MEM_READ_WRITE, Sizeof.cl_float * weightCount, null, null
 		);
-		memory[NEURON_COUNTS_INDEX] = clCreateBuffer(
-			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, Sizeof.cl_int * neuronCounts.length, Pointer.to(neuronCounts), null
-		);
-		memory[LAYER_OFFSETS_INDEX] = clCreateBuffer(
-			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, Sizeof.cl_int * layerOffsets.length, Pointer.to(layerOffsets), null
+		int layerInfos[] = new int[layerSizes.length * 2];
+		for(int i = 0; i < layerSizes.length; i++){
+			layerInfos[2 * i] = layerSizes[i];
+			layerInfos[2 * i + 1] = layerOffsets[i];
+		}
+		memory[LAYER_INFOS_INDEX] = clCreateBuffer(
+			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, Sizeof.cl_int * layerInfos.length, Pointer.to(layerInfos), null
 		);
 		memory[NEURON_OFFSETS_INDEX] = clCreateBuffer(
 			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, Sizeof.cl_int * neuronOffsets.length, Pointer.to(neuronOffsets), null
@@ -84,11 +92,15 @@ public class FastFloodOpenCL
 		program = ProgramBuilder.loadAndBuildProgram(context, config.device, "/fast-flood.cl", true);
 		
 		calculatdeLayerKernel = clCreateKernel(program, "calculateLayer", null);
+		calculateFirstLayerKernel = clCreateKernel(program, "calculateFirstLayer", null);
 		trainLayerKernel = clCreateKernel(program, "trainLayer", null);
 		// set kernel arguments
+		clSetKernelArg(calculateFirstLayerKernel, INPUTS_INDEX, Sizeof.cl_mem, Pointer.to(memory[INPUTS_INDEX]));
 		for(int i = 0; i < memory.length; i++){
-			clSetKernelArg(calculatdeLayerKernel, i, Sizeof.cl_mem, Pointer.to(memory[i]));
-			clSetKernelArg(trainLayerKernel, i, Sizeof.cl_mem, Pointer.to(memory[i]));
+			Pointer pointer = Pointer.to(memory[i + 1]);
+			clSetKernelArg(calculatdeLayerKernel    , i    , Sizeof.cl_mem, pointer);
+			clSetKernelArg(calculateFirstLayerKernel, i + 1, Sizeof.cl_mem, pointer);
+			clSetKernelArg(trainLayerKernel         , i    , Sizeof.cl_mem, pointer);
 		}
 		
 		randomFloatArrayKernel = clCreateKernel(program, "randomFloatArray", null);
@@ -107,7 +119,7 @@ public class FastFloodOpenCL
 		clSetKernelArg(calculatdeLayerKernel, CURRENT_LAYER_INDEX, Sizeof.cl_int, Pointer.to(new int[]{layer}));
 		
 		clEnqueueNDRangeKernel(
-			commandQueue, calculatdeLayerKernel, 1, null, new long[]{neuronCounts[layer]}, new long[]{1}, 0, null, null
+			commandQueue, calculatdeLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
 		);
 		clFinish(commandQueue);
 	}
@@ -118,7 +130,7 @@ public class FastFloodOpenCL
 		clSetKernelArg(trainLayerKernel, CURRENT_LAYER_INDEX, Sizeof.cl_int, Pointer.to(new int[]{layer}));
 		
 		clEnqueueNDRangeKernel(
-			commandQueue, trainLayerKernel, 1, null, new long[]{neuronCounts[layer]}, new long[]{1}, 0, null, null
+			commandQueue, trainLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
 		);
 		clFinish(commandQueue);
 	}
@@ -134,7 +146,7 @@ public class FastFloodOpenCL
 	@Override
 	protected void readOutputs() throws IOException{
 		clEnqueueReadBuffer(
-			commandQueue, memory[OUTPUTS_INDEX], CL_TRUE, outputByteOffset, outputByteSize, pointers[OUTPUTS_INDEX], 0, null, null
+			commandQueue, memory[NEURONS_INDEX], CL_TRUE, outputByteOffset, outputByteSize, pointers[OUTPUTS_INDEX], 0, null, null
 		);
 	}
 	
@@ -146,6 +158,7 @@ public class FastFloodOpenCL
 		}
 		
 		clReleaseKernel(calculatdeLayerKernel);
+		clReleaseKernel(calculateFirstLayerKernel);
 		clReleaseKernel(trainLayerKernel);
 		clReleaseKernel(randomFloatArrayKernel);
 		
