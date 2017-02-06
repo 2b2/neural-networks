@@ -4,6 +4,10 @@ build/
 classes/
 *.class
 
+# Native Libraries
+*.dll
+*.so
+
 # Package Files
 *.war
 *.ear
