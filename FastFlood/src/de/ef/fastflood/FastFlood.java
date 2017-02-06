@@ -32,21 +32,21 @@ public abstract class FastFlood
 	
 	
 	
-	protected final int neuronCounts[], layerOffsets[], neuronOffsets[], weightCount;
-	protected final float inputs[], outputs[];
+	protected final int layerSizes[], layerOffsets[], neuronOffsets[], weightCount;
+	protected float inputs[], outputs[];
 	
 	
 	protected FastFlood(int inputSize, int hiddenSizes[], int outputSize){
-		neuronCounts = new int[2 + hiddenSizes.length];
+		layerSizes = new int[2 + hiddenSizes.length];
 		layerOffsets = new int[2 + hiddenSizes.length];
 		
 		int lastNeuronCount = inputSize;
 		int totalNeuronCount = inputSize, totalWeightCount = 0;
 		
-		neuronCounts[0] = inputSize;
+		layerSizes[0] = inputSize;
 		layerOffsets[0] = 0;
 		for(int i = 0; i < hiddenSizes.length; i++){
-			neuronCounts[i + 1] = hiddenSizes[i];
+			layerSizes[i + 1] = hiddenSizes[i];
 			// layer offset current total neuron count
 			layerOffsets[i + 1] = totalNeuronCount;
 			totalNeuronCount += hiddenSizes[i];
@@ -54,17 +54,16 @@ public abstract class FastFlood
 			totalWeightCount += hiddenSizes[i] * (lastNeuronCount + 1);
 			lastNeuronCount = hiddenSizes[i];
 		}
-		neuronCounts[neuronCounts.length - 1] = outputSize;
-		layerOffsets[neuronCounts.length - 1] = totalNeuronCount;
+		layerSizes[layerSizes.length - 1] = outputSize;
+		layerOffsets[layerSizes.length - 1] = totalNeuronCount;
 		totalNeuronCount += outputSize;
 		totalWeightCount += outputSize * (lastNeuronCount + 1);
 		
-		// init the inputs, outputs and weights arrays
-		inputs = new float[neuronCounts[0]];
-		outputs = new float[neuronCounts[neuronCounts.length - 1]];
+		// init the outputs and weights arrays
+		outputs = new float[outputSize];
 		weightCount = totalWeightCount;
 		
-		// now init the neuron offsets
+		// now init the neuron offsets, ignore input neurons
 		neuronOffsets = new int[totalNeuronCount - inputSize];
 		
 		// first offset is zero
@@ -72,8 +71,8 @@ public abstract class FastFlood
 		// loop through each neuron, skip input layer because every neuron has zero weights
 		for(int i = 1, index = 0, layer = 1; i < neuronOffsets.length; i++, index++){
 			// neuron offset is last offset plus last layer length plus one for the bias weight
-			neuronOffsets[i] = neuronOffsets[i - 1] + neuronCounts[layer - 1] + 1;
-			if(index == neuronCounts[layer]){
+			neuronOffsets[i] = neuronOffsets[i - 1] + layerSizes[layer - 1] + 1;
+			if(index == layerSizes[layer]){
 				layer++;
 				index = 0;
 			}
@@ -83,12 +82,12 @@ public abstract class FastFlood
 	
 	@Override
 	public float[] calculate(float inputs[]) throws IOException{
-		for(int i = 0; i < neuronCounts[0]; i++){
-			inputs[i] = (float)inputs[i];
-		}
+		if(inputs.length < layerSizes[0])
+			throw new ArrayIndexOutOfBoundsException("Input to small");
+		this.inputs = inputs;
 		
 		this.writeInputs();
-		for(int i = 1; i < neuronCounts.length; i++){
+		for(int i = 1; i < layerSizes.length; i++){
 			this.calculateLayer(i);
 		}
 		this.readOutputs();
@@ -110,7 +109,7 @@ public abstract class FastFlood
 		// update neural network to get current output
 		this.calculate(inputs);
 		// run through each layer (except input), reversed order
-		for(int i = neuronCounts.length - 1; i > 0; i--)
+		for(int i = layerSizes.length - 1; i > 0; i--)
 			this.trainLayer(i);
 		
 		return this.calculateError(expectedOutputs);
