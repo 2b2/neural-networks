@@ -118,9 +118,14 @@ public class FastFloodOpenCL
 	protected void calculateLayer(int layer) throws IOException{
 		clSetKernelArg(calculateLayerKernel, CURRENT_LAYER_INDEX, Sizeof.cl_int, Pointer.to(new int[]{layer}));
 		
-		clEnqueueNDRangeKernel(
-			commandQueue, calculateLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
-		);
+		if(layer == 1)
+			clEnqueueNDRangeKernel(
+				commandQueue, calculateFirstLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
+			);
+		else
+			clEnqueueNDRangeKernel(
+				commandQueue, calculateLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
+			);
 		clFinish(commandQueue);
 	}
 	
