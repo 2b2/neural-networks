@@ -43,7 +43,7 @@ public class FastFloodOpenCL
 	private final cl_mem memory[];
 	private final cl_program program;
 	private final cl_kernel
-		calculatdeLayerKernel, calculateFirstLayerKernel,
+		calculateLayerKernel, calculateFirstLayerKernel,
 		trainLayerKernel, randomFloatArrayKernel;
 	
 	
@@ -91,14 +91,14 @@ public class FastFloodOpenCL
 		
 		program = ProgramBuilder.loadAndBuildProgram(context, config.device, "/fast-flood.cl", true);
 		
-		calculatdeLayerKernel = clCreateKernel(program, "calculateLayer", null);
+		calculateLayerKernel = clCreateKernel(program, "calculateLayer", null);
 		calculateFirstLayerKernel = clCreateKernel(program, "calculateFirstLayer", null);
 		trainLayerKernel = clCreateKernel(program, "trainLayer", null);
 		// set kernel arguments
 		clSetKernelArg(calculateFirstLayerKernel, INPUTS_INDEX, Sizeof.cl_mem, Pointer.to(memory[INPUTS_INDEX]));
 		for(int i = 0; i < memory.length; i++){
 			Pointer pointer = Pointer.to(memory[i + 1]);
-			clSetKernelArg(calculatdeLayerKernel    , i    , Sizeof.cl_mem, pointer);
+			clSetKernelArg(calculateLayerKernel    , i    , Sizeof.cl_mem, pointer);
 			clSetKernelArg(calculateFirstLayerKernel, i + 1, Sizeof.cl_mem, pointer);
 			clSetKernelArg(trainLayerKernel         , i    , Sizeof.cl_mem, pointer);
 		}
@@ -116,10 +116,10 @@ public class FastFloodOpenCL
 	
 	@Override
 	protected void calculateLayer(int layer) throws IOException{
-		clSetKernelArg(calculatdeLayerKernel, CURRENT_LAYER_INDEX, Sizeof.cl_int, Pointer.to(new int[]{layer}));
+		clSetKernelArg(calculateLayerKernel, CURRENT_LAYER_INDEX, Sizeof.cl_int, Pointer.to(new int[]{layer}));
 		
 		clEnqueueNDRangeKernel(
-			commandQueue, calculatdeLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
+			commandQueue, calculateLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
 		);
 		clFinish(commandQueue);
 	}
@@ -157,7 +157,7 @@ public class FastFloodOpenCL
 			clReleaseMemObject(memory[i]);
 		}
 		
-		clReleaseKernel(calculatdeLayerKernel);
+		clReleaseKernel(calculateLayerKernel);
 		clReleaseKernel(calculateFirstLayerKernel);
 		clReleaseKernel(trainLayerKernel);
 		clReleaseKernel(randomFloatArrayKernel);
