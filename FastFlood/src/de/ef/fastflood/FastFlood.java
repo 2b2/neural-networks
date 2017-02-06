@@ -41,7 +41,7 @@ public abstract class FastFlood
 		layerOffsets = new int[2 + hiddenSizes.length];
 		
 		int lastNeuronCount = inputSize;
-		int totalNeuronCount = inputSize, totalWeightCount = 0;
+		int totalNeuronCount = 0, totalWeightCount = 0;
 		
 		layerSizes[0] = inputSize;
 		layerOffsets[0] = 0;
