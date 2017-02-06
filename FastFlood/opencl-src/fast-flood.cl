@@ -1,12 +1,13 @@
 __kernel void calculateLayer(
 		__global float *neurons, __global float *weights,
-		__constant int *neuronCounts, __constant int *layerOffsets, __constant int *neuronOffsets, const int layer){
+		__constant int *layerInfos, __constant int *neuronOffsets, const int layer){
 	int gid = get_global_id(0);
 	
-	const int lastLayerSize = neuronCounts[layer - 1];
-	const int lastLayerOffset = layerOffsets[layer - 1];
-	// neuron offset in weights array, adjusted for missing input layer
-	const int neuronOffset = neuronOffsets[(layerOffsets[layer] - neuronCounts[0]) + gid];
+	const int lastLayerSize = layerInfos[2 * (layer - 1)];
+	const int lastLayerOffset = layerInfos[2 * (layer - 1) + 1];
+	// neuron offset in weights array
+	const int neuronOffset = neuronOffsets[layerInfos[2 * layer] + gid];
+	
 	// calculate input sum for neuron
 	float sum = 0;
 	for(int i = 0; i < lastLayerSize; i++)
@@ -14,7 +15,26 @@ __kernel void calculateLayer(
 	// bias neuron weight
 	sum += weights[neuronOffset + lastLayerSize];
 	// calculate output for neuron via sigmoid function
-	neurons[layerOffsets[layer] + gid] = 1 / (1 + powr(M_E_F, -sum));
+	neurons[layerInfos[2 * layer] + gid] = 1 / (1 + powr(M_E_F, -sum));
+}
+
+__kernel void calculateFirstLayer(
+		__global float *inputs, __global float *neurons, __global float *weights,
+		__constant int *layerInfos, __constant int *neuronOffsets, const int layer){
+	int gid = get_global_id(0);
+	
+	const int inputLayerSize = layerInfos[0];
+	// neuron offset in weights array
+	const int neuronOffset = neuronOffsets[gid];
+	
+	// calculate input sum for neuron
+	float sum = 0;
+	for(int i = 0; i < inputLayerSize; i++)
+		sum += inputs[i] * weights[neuronOffset + i];
+	// bias neuron weight
+	sum += weights[neuronOffset + inputLayerSize];
+	// calculate output for neuron via sigmoid function
+	neurons[gid] = 1 / (1 + powr(M_E_F, -sum));
 }
 
 
