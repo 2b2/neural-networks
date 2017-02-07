@@ -3,8 +3,8 @@ package de.ef.neuralnetworks;
 import java.io.IOException;
 import java.util.function.Function;
 
-public final class NeuralNetworkWrapper<I, O, N>
-	implements NeuralNetwork<I, N>{
+public final class NeuralNetworkWrapper<I, O, IW, OW>
+	implements NeuralNetwork<IW, OW>{
 	
 	private static final long serialVersionUID = 1L;
 	// TODO serial conversion passthru
@@ -12,30 +12,33 @@ public final class NeuralNetworkWrapper<I, O, N>
 	
 	
 	private final NeuralNetwork<I, O> network;
-	private final Function<O, N> converter;
-	private final Function<N, O> reverseConverter;
+	private final Function<IW, I> inputConverter;
+	private final Function<O, OW> outputConverter;
+	private final Function<OW, O> reverseOutputConverter;
 	
 	
-	public NeuralNetworkWrapper(NeuralNetwork<I, O> network, Function<O, N> converter, Function<N, O> reverseConverter){
+	public NeuralNetworkWrapper(NeuralNetwork<I, O> network,
+			Function<IW, I> inputConverter, Function<O, OW> outputConverter, Function<OW, O> reverseOutputConverter){
 		this.network = network;
 		
-		this.converter = converter;
-		this.reverseConverter = reverseConverter;
+		this.inputConverter = inputConverter;
+		this.outputConverter = outputConverter;
+		this.reverseOutputConverter = reverseOutputConverter;
 	}
 	
 	
 	@Override
-	public N calculate(I input) throws IOException{
-		return this.converter.apply(this.network.calculate(input));
+	public OW calculate(IW input) throws IOException{
+		return this.outputConverter.apply(this.network.calculate(this.inputConverter.apply(input)));
 	}
 	
 	@Override
-	public double train(I input, N output) throws IOException{
-		return this.network.train(input, this.reverseConverter.apply(output));
+	public double train(IW input, OW output) throws IOException{
+		return this.network.train(this.inputConverter.apply(input), this.reverseOutputConverter.apply(output));
 	}
 	
 	@Override
-	public double train(I input, N output, double learningRate) throws IOException{
-		return this.network.train(input, this.reverseConverter.apply(output), learningRate);
+	public double train(IW input, OW output, double learningRate) throws IOException{
+		return this.network.train(this.inputConverter.apply(input), this.reverseOutputConverter.apply(output), learningRate);
 	}
 }
