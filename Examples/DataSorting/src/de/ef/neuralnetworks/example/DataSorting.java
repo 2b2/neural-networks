@@ -30,7 +30,6 @@ import de.ef.neuralnetworks.NeuralNetwork;
 import de.ef.neuralnetworks.NeuralNetworkComparator;
 import de.ef.neuralnetworks.NeuralNetworkContext;
 import de.ef.neuralnetworks.NeuralNetworkContextFactory;
-import de.ef.neuralnetworks.NeuralNetworkWrapper;
 import de.ef.neuralnetworks.pipeline.Pipeline;
 import de.ef.neuralnetworks.pipeline.PipelineBuilder;
 import de.ef.neuralnetworks.pipeline.image.GrayscaleImageConverter;
@@ -67,7 +66,7 @@ public class DataSorting{
 				"Dataset not found. (Expected at " + dataSet.getAbsolutePath() + ")"
 			);
 		
-		NeuralNetwork<double[], double[]> equal, compare;
+		NeuralNetwork<double[], Float> equal, compare;
 		
 		File comparatorData = new File("./comp.dat");
 		if(comparatorData.exists() == false){
@@ -82,15 +81,15 @@ public class DataSorting{
 			properties.put("layers.hidden[0].size", 128);
 			properties.put("layers.hidden[1].size", 128);
 			
-			equal = context.createNeuralNetwork(double[].class, double[].class, properties);
-			compare = context.createNeuralNetwork(double[].class, double[].class, properties);
+			equal = context.createNeuralNetwork(double[].class, Float.class, properties);
+			compare = context.createNeuralNetwork(double[].class, Float.class, properties);
 		}
 		else{
 			System.out.println("Loading neural-networks from file...");
 			try(ObjectInputStream input =
 					new ObjectInputStream(new FileInputStream(comparatorData))){
-				equal = (NeuralNetwork<double[], double[]>)input.readObject();
-				compare = (NeuralNetwork<double[], double[]>)input.readObject();
+				equal = (NeuralNetwork<double[], Float>)input.readObject();
+				compare = (NeuralNetwork<double[], Float>)input.readObject();
 			}
 		}
 		
@@ -141,13 +140,11 @@ public class DataSorting{
 	private Pipeline<BufferedImage, double[]> inputPipeline;
 	
 	
-	public DataSorting(ZipFile dataSet, NeuralNetwork<double[], double[]> equal, NeuralNetwork<double[], double[]> compare){
+	public DataSorting(ZipFile dataSet, NeuralNetwork<double[], Float> equal, NeuralNetwork<double[], Float> compare){
 		this.dataSet = dataSet;
 		
 		this.comparator = new NeuralNetworkComparator<>(
-			new NeuralNetworkWrapper<>(equal, array -> (float)array[0], f -> new double[]{f}),
-			new NeuralNetworkWrapper<>(compare, array -> (float)array[0], f -> new double[]{f}),
-			(a, b) -> {
+			equal, compare, (a, b) -> {
 				double[] combined = new double[a.length + b.length];
 				System.arraycopy(a, 0, combined, 0, a.length);
 				System.arraycopy(b, 0, combined, a.length, b.length);
