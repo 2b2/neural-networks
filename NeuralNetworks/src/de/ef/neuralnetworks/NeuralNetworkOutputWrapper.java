@@ -3,10 +3,10 @@ package de.ef.neuralnetworks;
 import java.io.IOException;
 import java.util.function.Function;
 
-public final class NeuralNetworkOutputWrapper<I, O, OW>
+final class NeuralNetworkOutputWrapper<I, O, OW>
 	implements NeuralNetwork<I, OW>{
 	
-	private static final long serialVersionUID = 1L;
+	private final static long serialVersionUID = 1L;
 	// TODO serial conversion passthru
 	
 	
