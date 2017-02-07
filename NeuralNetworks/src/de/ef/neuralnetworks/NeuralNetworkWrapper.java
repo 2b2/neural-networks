@@ -7,40 +7,88 @@ public final class NeuralNetworkWrapper<I, O, IW, OW>
 	implements NeuralNetwork<IW, OW>{
 	
 	@SuppressWarnings("unchecked")
-	public final static <I, O> NeuralNetwork<I, O> wrap(
+	public static <I, O, P> NeuralNetwork<I, O> wrapPrimitiveArray(
+			NeuralNetwork<P, P> network, Class<P> primitiveArrayClass, Class<I> inputClass, Class<O> outputClass){
+		if(primitiveArrayClass == float[].class)
+			return wrapFloat((NeuralNetwork<float[], float[]>)network, inputClass, outputClass);
+		if(primitiveArrayClass == double[].class)
+			return wrapDouble((NeuralNetwork<double[], double[]>)network, inputClass, outputClass);
+		throw new NoWrapperFoundException("No primitive array wrapper for type: " + primitiveArrayClass);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <I, O> NeuralNetwork<I, O> wrapFloat(
 			NeuralNetwork<float[], float[]> network, Class<I> inputClass, Class<O> outputClass){
 		if(inputClass == float[].class){
 			if(outputClass == float[].class)
 				return (NeuralNetwork<I, O>)network;
 			
-			OutputConverter<float[], O> outputWrap = wrapOutput(outputClass);
+			OutputConverter<float[], O> outputWrap = wrapOutputFloat(outputClass);
 			return (NeuralNetwork<I, O>)
 				new NeuralNetworkOutputWrapper<>(network, outputWrap.forward, outputWrap.reverse);
 		}
 		else if(outputClass == float[].class)
-			return (NeuralNetwork<I, O>)new NeuralNetworkInputWrapper<>(network, wrapInput(inputClass));
+			return (NeuralNetwork<I, O>)new NeuralNetworkInputWrapper<>(network, wrapInputFloat(inputClass));
 		
-		OutputConverter<float[], O> outputWrap = wrapOutput(outputClass);
+		OutputConverter<float[], O> outputWrap = wrapOutputFloat(outputClass);
 		return (NeuralNetwork<I, O>)
-			new NeuralNetworkWrapper<>(network, wrapInput(inputClass), outputWrap.forward, outputWrap.reverse);
+			new NeuralNetworkWrapper<>(network, wrapInputFloat(inputClass), outputWrap.forward, outputWrap.reverse);
 	}
 	
-	private final static <I> Function<I, float[]> wrapInput(Class<I> inputClass){
-		if(inputClass == Float.class) return i -> new float[]{(Float)i};
+	private static <I> Function<I, float[]> wrapInputFloat(Class<I> inputClass){
+		if(inputClass == Float.class) return i -> new float[]{(float)i};
 		if(inputClass.getSuperclass() == Number.class) return i -> new float[]{((Number)i).floatValue()};
 		throw new NoWrapperFoundException("No input wrapper found.");
 	}
 	
 	@SuppressWarnings("unchecked")
-	private final static <O> OutputConverter<float[], O> wrapOutput(Class<O> outputClass){
-		OutputConverter<?, ?> converter;
+	private static <O> OutputConverter<float[], O> wrapOutputFloat(Class<O> outputClass){
+		OutputConverter<float[], ?> converter;
 		if(outputClass == Float.class)
 			converter = new OutputConverter<float[], Float>(o -> o[0], o -> new float[]{(Float)o});
 		else if(outputClass == Double.class)
-			converter = new OutputConverter<float[], Double>(o -> Double.valueOf(o[0]), o -> new float[]{o.floatValue()});
+			converter = new OutputConverter<float[], Double>(o -> (double)o[0], o -> new float[]{o.floatValue()});
 		else throw new NoWrapperFoundException("No output wrapper found.");
 		
 		return (OutputConverter<float[], O>)converter;
+	}
+	
+	
+	@SuppressWarnings("unchecked")
+	private static <I, O> NeuralNetwork<I, O> wrapDouble(
+			NeuralNetwork<double[], double[]> network, Class<I> inputClass, Class<O> outputClass){
+		if(inputClass == double[].class){
+			if(outputClass == double[].class)
+				return (NeuralNetwork<I, O>)network;
+			
+			OutputConverter<double[], O> outputWrap = wrapOutputDouble(outputClass);
+			return (NeuralNetwork<I, O>)
+				new NeuralNetworkOutputWrapper<>(network, outputWrap.forward, outputWrap.reverse);
+		}
+		else if(outputClass == double[].class)
+			return (NeuralNetwork<I, O>)new NeuralNetworkInputWrapper<>(network, wrapInputDouble(inputClass));
+		
+		OutputConverter<double[], O> outputWrap = wrapOutputDouble(outputClass);
+		return (NeuralNetwork<I, O>)
+			new NeuralNetworkWrapper<>(network, wrapInputDouble(inputClass), outputWrap.forward, outputWrap.reverse);
+	}
+	
+	private static <I> Function<I, double[]> wrapInputDouble(Class<I> inputClass){
+		if(inputClass == Float.class) return i -> new double[]{(double)i};
+		if(inputClass.getSuperclass() == Number.class) return i -> new double[]{((Number)i).floatValue()};
+		throw new NoWrapperFoundException("No input wrapper found.");
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <O> OutputConverter<double[], O> wrapOutputDouble(Class<O> outputClass){
+		OutputConverter<double[], ?> converter;
+		if(outputClass == Float.class)
+			converter = new OutputConverter<double[], Float>(o -> (float)o[0], o -> new double[]{o.doubleValue()});
+		else if(outputClass == Double.class)
+			converter = new OutputConverter<double[], Double>(o -> o[0], o -> new double[]{o});
+		else throw new NoWrapperFoundException("No output wrapper found.");
+		
+		return (OutputConverter<double[], O>)converter;
 	}
 	
 	
