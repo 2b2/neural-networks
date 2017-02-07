@@ -7,6 +7,7 @@ import java.util.Map;
 import de.ef.neuralnetworks.NeuralNetwork;
 import de.ef.neuralnetworks.NeuralNetworkContext;
 import de.ef.neuralnetworks.NeuralNetworkContextFactory;
+import de.ef.neuralnetworks.NeuralNetworkWrapper;
 
 public class SlowWaveContext
 	implements NeuralNetworkContext{
@@ -28,7 +29,6 @@ public class SlowWaveContext
 	
 	
 	@Override
-	@SuppressWarnings("unchecked")
 	public <I, O> NeuralNetwork<I, O> createNeuralNetwork(Class<I> inputClass, Class<O> outputClass, Map<String, Object> properties){
 		int inputLayerSize = (Integer)properties.get(INPUT_LAYER_SIZE);
 		int outputLayerSize = (Integer)properties.get(OUTPUT_LAYER_SIZE);
@@ -37,8 +37,9 @@ public class SlowWaveContext
 		for(int i = 0; i < hiddenLayerCount; i++)
 			hiddenLayerSizes[i] = (Integer)properties.get(HIDDEN_LAYER_SIZE.replace("*", String.valueOf(i)));
 		
-		if(inputClass == double[].class && outputClass == double[].class)
-			return (NeuralNetwork<I, O>)new SlowWave(inputLayerSize, hiddenLayerSizes, outputLayerSize);
-		return null;
+		return NeuralNetworkWrapper.wrapPrimitiveArray(
+			new SlowWave(inputLayerSize, hiddenLayerSizes, outputLayerSize),
+			double[].class, inputClass, outputClass
+		);
 	}
 }

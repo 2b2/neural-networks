@@ -16,6 +16,7 @@ import org.jocl.cl_platform_id;
 import de.ef.neuralnetworks.NeuralNetwork;
 import de.ef.neuralnetworks.NeuralNetworkContext;
 import de.ef.neuralnetworks.NeuralNetworkContextFactory;
+import de.ef.neuralnetworks.NeuralNetworkWrapper;
 
 import static org.jocl.CL.*;
 
@@ -39,7 +40,6 @@ public class FastFloodOpenCLContext
 	
 	
 	@Override
-	@SuppressWarnings("unchecked")
 	public <I, O> NeuralNetwork<I, O> createNeuralNetwork(Class<I> inputClass, Class<O> outputClass, Map<String, Object> properties){
 		int inputLayerSize = (Integer)properties.get(INPUT_LAYER_SIZE);
 		int outputLayerSize = (Integer)properties.get(OUTPUT_LAYER_SIZE);
@@ -50,9 +50,10 @@ public class FastFloodOpenCLContext
 		
 		OpenCLConfiguration config = (OpenCLConfiguration)properties.get("opencl.config"); // TODO make key constant
 		
-		if(inputClass == float[].class && outputClass == float[].class)
-			return (NeuralNetwork<I, O>)new FastFloodOpenCL(inputLayerSize, hiddenLayerSizes, outputLayerSize, config);
-		return null;
+		return NeuralNetworkWrapper.wrapPrimitiveArray(
+			new FastFloodOpenCL(inputLayerSize, hiddenLayerSizes, outputLayerSize, config),
+			float[].class, inputClass, outputClass
+		);
 	}
 	
 	
