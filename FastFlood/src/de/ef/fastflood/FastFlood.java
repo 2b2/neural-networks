@@ -63,8 +63,8 @@ public abstract class FastFlood
 		outputs = new float[outputSize];
 		weightCount = totalWeightCount;
 		
-		// now init the neuron offsets, ignore input neurons
-		neuronOffsets = new int[totalNeuronCount - inputSize];
+		// now init the neuron offsets, without input neurons
+		neuronOffsets = new int[totalNeuronCount];
 		
 		// first offset is zero
 		neuronOffsets[0] = 0;
