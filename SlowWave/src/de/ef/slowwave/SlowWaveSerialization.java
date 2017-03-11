@@ -3,7 +3,6 @@ package de.ef.slowwave;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.lang.reflect.Field;
 
 /**
  * {@code SlowWaveSerialization} is a helper class for
@@ -16,15 +15,27 @@ import java.lang.reflect.Field;
  */
 class SlowWaveSerialization{
 	
+	final static byte LEARNING_RATE_PROPERTY = 0;
+	
+	
+	
 	private SlowWaveSerialization(){}
 	
 	
 	
 	static void write(SlowWave network, ObjectOutputStream output) throws IOException{
-		// write header byte with bit flags 0b0001 for double precision and 0b0010 for bias neuron
-		output.writeByte(0b0011);
+		// write header byte with bit flags 0b0001 for double precision, 0b0010 for bias neuron and 0b0100 for extra properties
+		output.writeByte(0b0111);
 		
-		SlowWave.Neuron layers[][] = network.getLayers();
+		// write properties
+		// property count as short
+		output.writeShort(1);
+		// learning rate property
+		output.writeByte(LEARNING_RATE_PROPERTY);
+		output.writeByte(Double.BYTES);
+		output.writeDouble(network.learningRate);
+		
+		SlowWave.Neuron layers[][] = network.layers;
 		
 		output.writeInt(layers.length); // write layer count as integer
 		for(int layer = 0; layer < layers.length; layer++){
@@ -54,19 +65,44 @@ class SlowWaveSerialization{
 			throw new IOException("Incorrect serialization header: " + header);
 		}
 		
+		// keep track of all set properties
+		boolean learningRateSet = false;
+		
+		// read properties if present
+		if((header & 0b0100) == 0b0100){
+			int count = input.readShort();
+			
+			for(int i = 0; i < count; i++){
+				byte property = input.readByte();
+				int size = 0, next, currentBit = 0;
+				do{
+					next = (input.readByte() & 0xFF);
+					size |= next << currentBit;
+					currentBit += 7;
+				}while((next & 0b1000_0000) == 0b1000_0000);
+				
+				switch(property){
+					case LEARNING_RATE_PROPERTY:
+						if(size != Double.BYTES)
+							throw new IOException("Size of property does not match double size: " + size);
+						learningRateSet = true; network.learningRate = input.readDouble(); break;
+					default: // just read bytes and throw property away
+						for(int j = 0; j < size; j++) input.readByte();
+				}
+			}
+		}
+		// set all uninitialized properties
+		if(learningRateSet == false)
+			network.learningRate = SlowWave.DEFAULT_LEARNING_RATE;
+		
+		
 		SlowWave.Neuron layers[][] = new SlowWave.Neuron[input.readInt()][]; // read layer count
 		
 		for(int layer = 0; layer < layers.length; layer++){
 			layers[layer] = new SlowWave.Neuron[input.readInt()]; // read each neuron count
 		}
 		
-		try{
-			Field layersField = SlowWave.class.getDeclaredField("layers");
-			layersField.setAccessible(true);
-			layersField.set(network, layers);
-		}catch(Throwable t){
-			throw new IOException(t);
-		}
+		network.layers = layers;
 		
 		int lastNeuronCount = -1;
 		for(int layer = 0; layer < layers.length; layer++){

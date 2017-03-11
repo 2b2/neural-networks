@@ -38,8 +38,8 @@ public class SlowWave
 	
 	
 	
-	private Neuron layers[][];
-	private double learningRate;
+	Neuron layers[][];
+	double learningRate;
 	
 	
 	public SlowWave(){}
@@ -181,11 +181,6 @@ public class SlowWave
 	
 	private void readObject(ObjectInputStream input) throws IOException{
 		SlowWaveSerialization.read(this, input);
-	}
-	
-	
-	Neuron[][] getLayers(){
-		return this.layers;
 	}
 	
 	
