@@ -3,6 +3,8 @@ package de.ef.slowwave;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.Collections;
+import java.util.Map;
 
 import de.ef.neuralnetworks.NeuralNetwork;
 
@@ -17,16 +19,16 @@ import de.ef.neuralnetworks.NeuralNetwork;
  * </p>
  * 
  * @author Erik Fritzsche
- * @version 1.0
+ * @version 2.0
  * @since 1.0
  */
-public class SlowWave // FIXME make generic
+public class SlowWave
 	implements NeuralNetwork<double[], double[]>{
 	
 	/**
 	 * Make always same as @version in JavaDoc in format xxx.yyy.zzz
 	 */
-	private final static long serialVersionUID = 001_000_000L;
+	private final static long serialVersionUID = 002_000_000L;
 	
 	
 	/**
@@ -36,18 +38,15 @@ public class SlowWave // FIXME make generic
 	
 	
 	
-	private final Neuron layers[][];
+	private Neuron layers[][];
+	private double learningRate;
 	
 	
-	/**
-	 * Constructs a neural-network with {@code hiddenSizes.length + 2} layers.
-	 * The size of each layer is defined by the according parameter.
-	 * 
-	 * @param inputSize size of first layer
-	 * @param hiddenSizes sizes of the the layers between the first and the last
-	 * @param outputSize size of the last layer
-	 */
-	public SlowWave(int inputSize, int hiddenSizes[], int outputSize){
+	public SlowWave(){}
+	
+	
+	@Override
+	public void init(int inputSize, int hiddenSizes[], int outputSize, Map<String, Object> properties){
 		this.layers = new Neuron[2 + hiddenSizes.length][];
 		
 		// create the input layer
@@ -76,6 +75,11 @@ public class SlowWave // FIXME make generic
 		for(int i = 0; i < this.layers[0].length; i++){
 			this.layers[0][i] = new Neuron(new double[0]);
 		}
+		
+		// set properties
+		if(properties == null) properties = Collections.emptyMap();
+		
+		this.learningRate = (Double)properties.getOrDefault("learning.rate", DEFAULT_LEARNING_RATE);
 	}
 	
 	
@@ -113,14 +117,8 @@ public class SlowWave // FIXME make generic
 	}
 	
 	
-	// just call train with default learning rate
 	@Override
 	public double train(double inputs[], double outputs[]){
-		return this.train(inputs, outputs, DEFAULT_LEARNING_RATE);
-	}
-	
-	@Override
-	public double train(double inputs[], double outputs[], double learningRate){
 		// update neural network to get current output
 		this.calculate(inputs);
 		// run through each layer (except input), reversed order
