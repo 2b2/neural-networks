@@ -5,6 +5,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -18,7 +20,12 @@ public class SerializationTest{
 	
 	@Test
 	public void test(){
-		SlowWave s = new SlowWave(3, new int[]{2}, 1);
+		SlowWave s = new SlowWave();
+		
+		Map<String, Object> properties = new HashMap<>();
+		properties.put("learning.rate", 0.49515155);
+		
+		s.init(3, new int[]{2}, 1, properties);
 		
 		try{
 			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -30,6 +37,10 @@ public class SerializationTest{
 				new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()));
 			
 			SlowWave sRead = (SlowWave)in.readObject();
+			
+			Field learningRateField = SlowWave.class.getDeclaredField("learningRate");
+			learningRateField.setAccessible(true);
+			Assert.assertEquals((double)learningRateField.get(s), (double)learningRateField.get(sRead), 0.0);
 			
 			Field layersField = SlowWave.class.getDeclaredField("layers");
 			layersField.setAccessible(true);

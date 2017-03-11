@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -35,7 +36,7 @@ import java.util.function.Predicate;
  * @param I type of values to compare
  * 
  * @author Erik Fritzsche
- * @version 2.0
+ * @version 2.1
  * @since 1.0
  */
 public class NeuralNetworkComparator<I>
@@ -54,8 +55,11 @@ public class NeuralNetworkComparator<I>
 	
 	
 	
-	private final NeuralNetwork<Object, Float> equal, compare;
+	private final NeuralNetwork<Object, Object> equal, compare;
 	private final BiFunction<I, I, Object> inputConverter;
+	private final Function<Object, Float> outputConverter;
+	
+	private final Object notEqualCache, equalCache, lessThanCache, greaterThanCache;
 	
 	
 	/**
@@ -66,11 +70,19 @@ public class NeuralNetworkComparator<I>
 	 * @param inputConverter combines two inputs into one object consumable by {@code equal} and {@code compare}
 	 */
 	@SuppressWarnings("unchecked")
-	public <C> NeuralNetworkComparator(NeuralNetwork<C, Float> equal, NeuralNetwork<C, Float> compare, BiFunction<I, I, C> inputConverter){
-		this.equal = (NeuralNetwork<Object, Float>)equal;
-		this.compare = (NeuralNetwork<Object, Float>)compare;
+	public <C, O> NeuralNetworkComparator(
+			NeuralNetwork<C, O> equal, NeuralNetwork<C, O> compare,
+			BiFunction<I, I, C> inputConverter, Function<O, Float> outputConverter, Function<Float, O> reverseOutputConverter){
+		this.equal = (NeuralNetwork<Object, Object>)equal;
+		this.compare = (NeuralNetwork<Object, Object>)compare;
 		
 		this.inputConverter = (BiFunction<I, I, Object>)inputConverter;
+		this.outputConverter = (Function<Object, Float>)outputConverter;
+
+		this.notEqualCache    = reverseOutputConverter.apply(NOT_EQUAL);
+		this.equalCache       = reverseOutputConverter.apply(EQUAL);
+		this.lessThanCache    = reverseOutputConverter.apply(LESS_THAN);
+		this.greaterThanCache = reverseOutputConverter.apply(GREATER_THAN);
 	}
 	
 	
@@ -79,10 +91,10 @@ public class NeuralNetworkComparator<I>
 		try{
 			Object input = this.inputConverter.apply(a, b); 
 			
-			if(this.equal.calculate(input) > E_THRESHOLD)
+			if(this.outputConverter.apply(this.equal.calculate(input)) > E_THRESHOLD)
 				return 0;
 			
-			if(this.compare.calculate(input) > GT_THRESHOLD)
+			if(this.outputConverter.apply(this.compare.calculate(input)) > GT_THRESHOLD)
 				return 1;
 			return -1;
 		}
@@ -134,48 +146,50 @@ public class NeuralNetworkComparator<I>
 		for(OrderedPair pair : pairs){
 			count++;
 			if(pair.same == true)
-				totalError += this.equal.train(pair.data, EQUAL);
+				totalError += this.equal.train(pair.data, this.equalCache);
 			else{
-				totalError += this.equal.train(pair.data, NOT_EQUAL);
+				totalError += this.equal.train(pair.data, this.notEqualCache);
 				count++;
 				
 				Float expectedResult = expected.get(pair.id);
 				if(expectedResult == null){
 					// if expected result is null, reversed result is too
-					expectedResult = this.compare.calculate(pair.data);
+					expectedResult = this.outputConverter.apply(this.compare.calculate(pair.data));
 					if(expectedResult > GT_THRESHOLD)
-						totalError += this.compare.train(pair.data, GREATER_THAN);
+						totalError += this.compare.train(pair.data, this.greaterThanCache);
 					else
-						totalError += this.compare.train(pair.data, LESS_THAN);
+						totalError += this.compare.train(pair.data, this.lessThanCache);
 					
-					expectedResult = this.compare.calculate(pair.data); // recalculate after training
+					expectedResult = this.outputConverter.apply(this.compare.calculate(pair.data)); // recalculate after training
 					expected.put(pair.id, expectedResult);
 					expected.put(pair.reverseId, 1 - expectedResult);
 				}
 				else{
 					// if expected result is not null, reversed result is too
 					expectedResult =
-						(expectedResult + this.compare.calculate(pair.data)) / 2;
+						(expectedResult + this.outputConverter.apply(this.compare.calculate(pair.data))) / 2;
 					
 					Float reversedResult = expected.get(pair.reverseId);
 					
 					if(expectedResult > GT_THRESHOLD && reversedResult <= GT_THRESHOLD)
-						totalError += this.compare.train(pair.data, GREATER_THAN);
+						totalError += this.compare.train(pair.data, this.greaterThanCache);
 					else if(expectedResult <= GT_THRESHOLD && reversedResult > GT_THRESHOLD)
-						totalError += this.compare.train(pair.data, LESS_THAN);
+						totalError += this.compare.train(pair.data, this.lessThanCache);
 					else if(expectedResult > GT_THRESHOLD && reversedResult > GT_THRESHOLD)
 						totalError += this.compare.train(
 							pair.data,
-							expectedResult < reversedResult ? LESS_THAN : GREATER_THAN
+							expectedResult < reversedResult ? this.lessThanCache : this.greaterThanCache
 						);
 					else
 						totalError += this.compare.train(
 							pair.data,
-							expectedResult > reversedResult ? GREATER_THAN : LESS_THAN
+							expectedResult > reversedResult ? this.greaterThanCache : this.lessThanCache
 						);
 					
 					expectedResult =
-						(expected.get(pair.id) + this.compare.calculate(pair.data)) / 2; // recalculate after training
+						(
+							expected.get(pair.id) + this.outputConverter.apply(this.compare.calculate(pair.data))
+						) / 2; // recalculate after training
 					expected.put(pair.id, expectedResult);
 					expected.put(pair.reverseId, (reversedResult + (1 - expectedResult)) / 2);
 				}
@@ -188,7 +202,7 @@ public class NeuralNetworkComparator<I>
 		double totalError = 0;
 		for(OrderedPair pair : pairs){
 			if(pair.same == true)
-				totalError += (EQUAL - this.equal.calculate(pair.data));
+				totalError += (EQUAL - this.outputConverter.apply(this.equal.calculate(pair.data)));
 			else{
 				Float expectedResult = expected.get(pair.id);
 				// if for some reason there is no expected result for this pair
@@ -198,9 +212,9 @@ public class NeuralNetworkComparator<I>
 					continue;
 				}
 				if(expectedResult > GT_THRESHOLD)
-					totalError += (GREATER_THAN - this.compare.calculate(pair.data));
+					totalError += (GREATER_THAN - this.outputConverter.apply(this.compare.calculate(pair.data)));
 				else
-					totalError += (this.compare.calculate(pair.data));
+					totalError += this.outputConverter.apply(this.compare.calculate(pair.data));
 			}
 		}
 		return totalError / pairs.size();

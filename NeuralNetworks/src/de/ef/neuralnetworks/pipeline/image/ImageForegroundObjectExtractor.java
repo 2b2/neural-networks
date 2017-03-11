@@ -4,7 +4,7 @@ import java.util.function.Function;
 
 import de.ef.neuralnetworks.pipeline.BufferFactory;
 
-public abstract class ForegroundObjectExtractor
+public abstract class ImageForegroundObjectExtractor
 	implements Function<GrayscaleImage, GrayscaleImage>{
 	
 	private final int outputWidth, outputHeight, outputSize;
@@ -12,7 +12,7 @@ public abstract class ForegroundObjectExtractor
 	private final BufferFactory<byte[]> bufferFactory;
 	
 	
-	public ForegroundObjectExtractor(
+	public ImageForegroundObjectExtractor(
 			int outputWidth, int outputHeight, int backgroundThreshold,
 			BufferFactory<byte[]> bufferFactory){
 		this.outputWidth = outputWidth;
