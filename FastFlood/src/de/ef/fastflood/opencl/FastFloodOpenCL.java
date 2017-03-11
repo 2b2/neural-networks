@@ -29,16 +29,14 @@ public class FastFloodOpenCL
 	private final static long serialVersionUID = 002_000_000L;
 	
 	private final static int
-		INPUTS_INDEX = 0, OUTPUTS_INDEX = 1,
-		NEURONS_INDEX = 1, WEIGHTS_INDEX = 2,
-		LAYER_INFOS_INDEX = 3, NEURON_OFFSETS_INDEX = 4,
-		CURRENT_LAYER_INDEX = 5;
+		INPUTS_INDEX = 0, NEURONS_INDEX = 1, WEIGHTS_INDEX = 2,
+		LAYER_INFOS_INDEX = 3, NEURON_OFFSETS_INDEX = 4, CURRENT_LAYER_INDEX = 5;
 	
 	
 	
 	private final cl_context context;
 	private final cl_command_queue commandQueue;
-	private final Pointer pointers[];
+	private final Pointer outputPointer;
 	private final int inputByteSize, outputByteSize, outputByteOffset;
 	private final cl_mem memory[];
 	private final cl_program program;
@@ -58,11 +56,9 @@ public class FastFloodOpenCL
 		commandQueue = clCreateCommandQueue(context, config.device, 0, null);
 		//commandQueue = clCreateCommandQueueWithProperties(context, device, null, null);
 		
-		pointers = new Pointer[2];
-		pointers[INPUTS_INDEX] = Pointer.to(inputs);
-		pointers[OUTPUTS_INDEX] = Pointer.to(outputs);
+		outputPointer = Pointer.to(outputs);
 		
-		inputByteSize = Sizeof.cl_float * inputs.length;
+		inputByteSize = Sizeof.cl_float * inputSize;
 		outputByteSize = Sizeof.cl_float * outputs.length;
 		outputByteOffset = Sizeof.cl_float * neuronOffsets.length - outputs.length;
 		
@@ -89,16 +85,16 @@ public class FastFloodOpenCL
 			context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, Sizeof.cl_int * neuronOffsets.length, Pointer.to(neuronOffsets), null
 		);
 		
-		program = ProgramBuilder.loadAndBuildProgram(context, config.device, "/fast-flood.cl", true);
+		program = ProgramBuilder.loadAndBuildProgram(context, config.device, "/fast-flood.cl", false/* true */);
 		
 		calculateLayerKernel = clCreateKernel(program, "calculateLayer", null);
 		calculateFirstLayerKernel = clCreateKernel(program, "calculateFirstLayer", null);
 		trainLayerKernel = clCreateKernel(program, "trainLayer", null);
 		// set kernel arguments
 		clSetKernelArg(calculateFirstLayerKernel, INPUTS_INDEX, Sizeof.cl_mem, Pointer.to(memory[INPUTS_INDEX]));
-		for(int i = 0; i < memory.length; i++){
+		for(int i = 0; i < memory.length - 1; i++){
 			Pointer pointer = Pointer.to(memory[i + 1]);
-			clSetKernelArg(calculateLayerKernel    , i    , Sizeof.cl_mem, pointer);
+			clSetKernelArg(calculateLayerKernel     , i    , Sizeof.cl_mem, pointer);
 			clSetKernelArg(calculateFirstLayerKernel, i + 1, Sizeof.cl_mem, pointer);
 			clSetKernelArg(trainLayerKernel         , i    , Sizeof.cl_mem, pointer);
 		}
@@ -116,16 +112,17 @@ public class FastFloodOpenCL
 	
 	@Override
 	protected void calculateLayer(int layer) throws IOException{
-		clSetKernelArg(calculateLayerKernel, CURRENT_LAYER_INDEX, Sizeof.cl_int, Pointer.to(new int[]{layer}));
-		
-		if(layer == 1)
+		if(layer == 1){
 			clEnqueueNDRangeKernel(
 				commandQueue, calculateFirstLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
 			);
-		else
+		}
+		else{
+			clSetKernelArg(calculateLayerKernel, CURRENT_LAYER_INDEX, Sizeof.cl_int, Pointer.to(new int[]{layer}));
 			clEnqueueNDRangeKernel(
 				commandQueue, calculateLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
 			);
+		}
 		clFinish(commandQueue);
 	}
 	
@@ -133,7 +130,6 @@ public class FastFloodOpenCL
 	@Override
 	protected void trainLayer(int layer) throws IOException{
 		clSetKernelArg(trainLayerKernel, CURRENT_LAYER_INDEX, Sizeof.cl_int, Pointer.to(new int[]{layer}));
-		
 		clEnqueueNDRangeKernel(
 			commandQueue, trainLayerKernel, 1, null, new long[]{layerSizes[layer]}, new long[]{1}, 0, null, null
 		);
@@ -144,14 +140,14 @@ public class FastFloodOpenCL
 	@Override
 	protected void writeInputs() throws IOException{
 		clEnqueueWriteBuffer(
-			commandQueue, memory[INPUTS_INDEX], CL_TRUE, 0, inputByteSize, pointers[INPUTS_INDEX], 0, null, null
+			commandQueue, memory[INPUTS_INDEX], CL_TRUE, 0, inputByteSize, Pointer.to(inputs), 0, null, null
 		);
 	}
 	
 	@Override
 	protected void readOutputs() throws IOException{
 		clEnqueueReadBuffer(
-			commandQueue, memory[NEURONS_INDEX], CL_TRUE, outputByteOffset, outputByteSize, pointers[OUTPUTS_INDEX], 0, null, null
+			commandQueue, memory[NEURONS_INDEX], CL_TRUE, outputByteOffset, outputByteSize, outputPointer, 0, null, null
 		);
 	}
 	
