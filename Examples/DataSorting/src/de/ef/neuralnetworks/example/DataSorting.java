@@ -28,14 +28,12 @@ import javax.imageio.ImageIO;
 
 import de.ef.neuralnetworks.NeuralNetwork;
 import de.ef.neuralnetworks.NeuralNetworkComparator;
-import de.ef.neuralnetworks.NeuralNetworkContext;
-import de.ef.neuralnetworks.NeuralNetworkContextFactory;
 import de.ef.neuralnetworks.pipeline.Pipeline;
 import de.ef.neuralnetworks.pipeline.PipelineBuilder;
 import de.ef.neuralnetworks.pipeline.image.GrayscaleImageConverter;
+import de.ef.neuralnetworks.pipeline.image.ImageObjects;
 import de.ef.slowwave.pipeline.ByteArrayBufferFactory;
 import de.ef.slowwave.pipeline.ByteArrayBufferFactory.FixedByteArrayBufferFactory;
-import de.ef.slowwave.pipeline.image.SlowWaveForegroundObjectExtractor;
 
 /**
  * This example tries to sort a data-set consisting of the digits 0-9.
@@ -58,7 +56,7 @@ public class DataSorting{
 	
 	
 	@SuppressWarnings("unchecked")
-	public static void main(String ... args) throws IOException, ClassNotFoundException{
+	public static void main(String ... args) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException{
 		File dataSet = new File("../../Datasets/digits.dataset.zip");
 		
 		if(dataSet.exists() == false)
@@ -66,30 +64,28 @@ public class DataSorting{
 				"Dataset not found. (Expected at " + dataSet.getAbsolutePath() + ")"
 			);
 		
-		NeuralNetwork<double[], Float> equal, compare;
+		NeuralNetwork<double[], double[]> equal, compare;
 		
 		File comparatorData = new File("./comp.dat");
 		if(comparatorData.exists() == false){
 			System.out.println("Creating new neural-networks...");
-			Class.forName("de.ef.slowwave.SlowWaveContext");
-			NeuralNetworkContext context = NeuralNetworkContextFactory.create("SlowWave");
+
+			equal = NeuralNetwork.load("de.ef.slowwave.SlowWave");
+			compare = NeuralNetwork.load("de.ef.slowwave.SlowWave");
 			
 			Map<String, Object> properties = new HashMap<>();
-			properties.put("layers.input.size", INPUT_SIZE);
-			properties.put("layers.output.size", 1);
-			properties.put("layers.hidden.count", 2);
-			properties.put("layers.hidden[0].size", 128);
-			properties.put("layers.hidden[1].size", 128);
+			properties.put("learning.rate", 0.1);
 			
-			equal = context.createNeuralNetwork(double[].class, Float.class, properties);
-			compare = context.createNeuralNetwork(double[].class, Float.class, properties);
+			equal.init(INPUT_SIZE, new int[]{128, 128}, 1, properties);
+			compare.init(INPUT_SIZE, new int[]{128, 128}, 1, properties);
 		}
 		else{
 			System.out.println("Loading neural-networks from file...");
+			
 			try(ObjectInputStream input =
 					new ObjectInputStream(new FileInputStream(comparatorData))){
-				equal = (NeuralNetwork<double[], Float>)input.readObject();
-				compare = (NeuralNetwork<double[], Float>)input.readObject();
+				equal = (NeuralNetwork<double[], double[]>)input.readObject();
+				compare = (NeuralNetwork<double[], double[]>)input.readObject();
 			}
 		}
 		
@@ -140,7 +136,8 @@ public class DataSorting{
 	private Pipeline<BufferedImage, double[]> inputPipeline;
 	
 	
-	public DataSorting(ZipFile dataSet, NeuralNetwork<double[], Float> equal, NeuralNetwork<double[], Float> compare){
+	public DataSorting(ZipFile dataSet, NeuralNetwork<double[], double[]> equal, NeuralNetwork<double[], double[]> compare)
+			throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException{
 		this.dataSet = dataSet;
 		
 		this.comparator = new NeuralNetworkComparator<>(
@@ -149,15 +146,18 @@ public class DataSorting{
 				System.arraycopy(a, 0, combined, 0, a.length);
 				System.arraycopy(b, 0, combined, a.length, b.length);
 				return combined;
-			}
+			}, d -> (float)d[0], f -> new double[]{(double)f}
 		);
+		
+		ImageObjects imageObjects = ImageObjects.load("de.ef.slowwave.pipeline.image.SlowWaveImageObjects");
+		imageObjects.init(null);
 		this.inputPipeline =
 			new PipelineBuilder<BufferedImage, double[]>()
 			.root(
 				GrayscaleImageConverter.fromBufferedImage(new ByteArrayBufferFactory(1), false)
 			)
 			.pipe(
-				new SlowWaveForegroundObjectExtractor(
+				imageObjects.foregroundObjectExtractor(
 					INPUT_WIDTH, INPUT_HEIGHT, 127, new FixedByteArrayBufferFactory(INPUT_SIZE, 1)
 				)
 			)
