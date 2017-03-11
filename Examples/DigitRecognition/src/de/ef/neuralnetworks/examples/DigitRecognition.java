@@ -30,10 +30,10 @@ import de.ef.neuralnetworks.NeuralNetwork;
 import de.ef.neuralnetworks.pipeline.Pipeline;
 import de.ef.neuralnetworks.pipeline.PipelineBuilder;
 import de.ef.neuralnetworks.pipeline.image.GrayscaleImageConverter;
+import de.ef.neuralnetworks.pipeline.image.ImageObjects;
 import de.ef.neuralnetworks.util.NeuralNetworkTraining;
 import de.ef.slowwave.pipeline.ByteArrayBufferFactory;
 import de.ef.slowwave.pipeline.ByteArrayBufferFactory.FixedByteArrayBufferFactory;
-import de.ef.slowwave.pipeline.image.SlowWaveForegroundObjectExtractor;
 
 public class DigitRecognition{
 	
@@ -130,17 +130,21 @@ public class DigitRecognition{
 	private Pipeline<BufferedImage, double[]> inputPipeline;
 	
 	
-	public DigitRecognition(ZipFile dataSet, NeuralNetwork<double[], double[]> network){
+	public DigitRecognition(ZipFile dataSet, NeuralNetwork<double[], double[]> network)
+			throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException{
 		this.dataSet = dataSet;
 		
 		this.network = network;
+		
+		ImageObjects imageObjects = ImageObjects.load("de.ef.slowwave.pipeline.image.SlowWaveImageObjects");
+		imageObjects.init(null);
 		this.inputPipeline =
 			new PipelineBuilder<BufferedImage, double[]>()
 			.root(
 				GrayscaleImageConverter.fromBufferedImage(new ByteArrayBufferFactory(1), false)
 			)
 			.pipe(
-				new SlowWaveForegroundObjectExtractor(
+				imageObjects.foregroundObjectExtractor(
 					INPUT_WIDTH, INPUT_HEIGHT, 127, new FixedByteArrayBufferFactory(INPUT_SIZE, 1)
 				)
 			)
