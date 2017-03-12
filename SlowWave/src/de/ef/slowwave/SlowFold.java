@@ -11,6 +11,7 @@ public class SlowFold
 	int inputWidth, inputHeight, inputSize, inputDepth;
 	int filterWidth, filterHeight, filterSize, filterWidthPadding, filterHeightPadding;
 	float filters[][][];
+	boolean poolDownSample;
 	
 	SlowWave fullyConnected;
 	
@@ -51,6 +52,9 @@ public class SlowFold
 				}
 			}
 		}
+		
+		// other options
+		this.poolDownSample = (boolean)properties.getOrDefault("filters.pool.last-layer", false);
 	}
 	
 	
@@ -91,31 +95,57 @@ public class SlowFold
 			depth = this.filters[i].length;
 		}
 		
-		// maximum pooling // TODO make optional
-		int halfWidth = this.inputWidth / 2, halfHeight = this.inputHeight / 2;
-		double output[] = new double[halfWidth * halfHeight * depth];
-		for(int d = 0, offset = 0, index = 0; d < depth; d++, offset += this.inputSize){
-			for(int y = 0; y + 1 < this.inputHeight; y += 2){
-				for(int x = 0; x + 1 < this.inputWidth; x += 2, index++){
-					output[index] = (double)Math.max(
-						inputs[offset + (x + y * this.inputWidth)],
-						Math.max(
-							inputs[offset + ((x + 1) + y * this.inputWidth)],
+		double outputs[];
+		if(this.poolDownSample == true){
+			// use maximum pooling
+			int halfWidth = this.inputWidth / 2, halfHeight = this.inputHeight / 2;
+			outputs = new double[halfWidth * halfHeight * depth];
+			
+			for(int d = 0, offset = 0, index = 0; d < depth; d++, offset += this.inputSize){
+				for(int y = 0; y + 1 < this.inputHeight; y += 2){
+					for(int x = 0; x + 1 < this.inputWidth; x += 2, index++){
+						outputs[index] = (double)Math.max(
+							inputs[offset + (x + y * this.inputWidth)],
 							Math.max(
-								inputs[offset + (x + (y + 1) * this.inputWidth)],
-								inputs[offset + ((x + 1) + (y + 1) * this.inputWidth)]
+								inputs[offset + ((x + 1) + y * this.inputWidth)],
+								Math.max(
+									inputs[offset + (x + (y + 1) * this.inputWidth)],
+									inputs[offset + ((x + 1) + (y + 1) * this.inputWidth)]
+								)
 							)
-						)
-					);
+						);
+					}
 				}
 			}
 		}
+		else{
+			outputs = new double[this.inputSize * depth];
+			for(int i = 0; i < outputs.length; i++){
+				outputs[i] = (double)inputs[i];
+			}
+		}
 		
-		return output;
+		return outputs;
 	}
 	
 	@Override
 	public double[] calculateFullyConnected(double inputs[]){
 		return this.fullyConnected.calculate(inputs);
+	}
+	
+	
+	@Override
+	public double train(float inputs[], double outputs[]){
+		// forward pass filters
+		double filterForward[] = this.calculateFilters(inputs);
+		
+		// train fully connected layers with filter forward pass
+		double totalError = this.fullyConnected.train(filterForward, outputs);
+		
+		// train filters
+		// FIXME train filters
+		
+		// use total error of fully connected layers as total error of this neural-network
+		return totalError;
 	}
 }
