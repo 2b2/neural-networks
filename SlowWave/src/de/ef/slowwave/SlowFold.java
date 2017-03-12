@@ -3,6 +3,7 @@ package de.ef.slowwave;
 import java.util.Map;
 
 import de.ef.neuralnetworks.ConvolutionalNeuralNetwork;
+import de.ef.slowwave.pipeline.FloatArrayBufferFactory;
 
 public class SlowFold
 	implements ConvolutionalNeuralNetwork<float[], double[], double[]>{
@@ -10,7 +11,9 @@ public class SlowFold
 	
 	int inputWidth, inputHeight, inputSize, inputDepth;
 	int filterWidth, filterHeight, filterSize, filterWidthPadding, filterHeightPadding;
-	float filters[][][];
+	float filters[][][]; // TODO bias in filters
+	private FloatArrayBufferFactory buffers;
+	private double[] filterOutputBuffer;
 	boolean poolDownSample;
 	
 	SlowWave fullyConnected;
@@ -59,6 +62,13 @@ public class SlowFold
 		
 		// other options
 		this.poolDownSample = (boolean)properties.getOrDefault("filters.pool.last-layer", false);
+		
+		// init buffers
+		this.buffers = new FloatArrayBufferFactory(2);
+		int depth = (this.filters.length > 0 ? this.filters[this.filters.length - 1].length : this.inputDepth);
+		this.filterOutputBuffer = new double[
+			(this.inputWidth * this.inputHeight) / (this.poolDownSample ? 4 : 1) * depth
+		];
 	}
 	
 	
@@ -70,7 +80,7 @@ public class SlowFold
 		int depth = this.inputDepth;
 		for(int i = 0; i < this.filters.length; i++){
 			activationIndex = 0;
-			activationMap = new float[this.inputSize * this.filters[i].length];
+			activationMap = this.buffers.getBuffer(this.inputSize * this.filters[i].length, false);
 			
 			for(int j = 0; j < this.filters[i].length; j++){
 				for(int y = 0; y < this.inputHeight; y++){
@@ -99,12 +109,9 @@ public class SlowFold
 			depth = this.filters[i].length;
 		}
 		
-		double outputs[];
+		double outputs[] = this.filterOutputBuffer;
 		if(this.poolDownSample == true){
 			// use maximum pooling
-			int halfWidth = this.inputWidth / 2, halfHeight = this.inputHeight / 2;
-			outputs = new double[halfWidth * halfHeight * depth];
-			
 			for(int d = 0, offset = 0, index = 0; d < depth; d++, offset += this.inputSize){
 				for(int y = 0; y + 1 < this.inputHeight; y += 2){
 					for(int x = 0; x + 1 < this.inputWidth; x += 2, index++){
@@ -123,7 +130,6 @@ public class SlowFold
 			}
 		}
 		else{
-			outputs = new double[this.inputSize * depth];
 			for(int i = 0; i < outputs.length; i++){
 				outputs[i] = (double)inputs[i];
 			}
