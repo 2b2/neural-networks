@@ -48,6 +48,17 @@ public final class GrayscaleImageConverter{
 	}
 	
 	
+	public static Function<GrayscaleImage, float[]> toFloatArray(BufferFactory<float[]> bufferFactory){
+		return input -> {
+			int length = input.width * input.height;
+			float[] output = bufferFactory.getBuffer(length, false);
+			for(int i = 0; i < length; i++)
+				output[i] = (input.data[i] & 0xFF) / 255.0f;
+			
+			return output;
+		};
+	}
+	
 	public static Function<GrayscaleImage, double[]> toDoubleArray(BufferFactory<double[]> bufferFactory){
 		return input -> {
 			int length = input.width * input.height;
