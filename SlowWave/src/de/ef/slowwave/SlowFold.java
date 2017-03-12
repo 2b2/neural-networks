@@ -21,6 +21,7 @@ public class SlowFold
 	
 	@Override
 	public void init(int inputSize, int hiddenSizes[], int outputSize, Map<String, Object> properties){
+		this.fullyConnected = new SlowWave();
 		this.fullyConnected.init(inputSize, hiddenSizes, outputSize, properties);
 		
 		// TODO hardcoded
@@ -32,15 +33,18 @@ public class SlowFold
 		this.filterHeightPadding = (this.filterHeight - 1) / 2;
 		this.filters = new float[(int)properties.get("filters.layers.count")][][];
 		
-		// init first layer
+		// setup input dimensions
 		this.inputDepth = (int)properties.getOrDefault("input.depth", 1);
 		this.inputWidth = (int)properties.getOrDefault("input.width", inputSize);
 		this.inputHeight = inputSize / (this.inputDepth * this.inputWidth);
 		this.inputSize = this.inputWidth * this.inputHeight;
 		
-		this.filters[0] = new float[(int)properties.get("filters.layers.0")][];
-		for(int i = 0; i < this.filters[0].length; i++){
-			this.filters[0][i] = new float[this.filterSize * this.inputDepth];
+		// init first layer
+		if(this.filters.length > 0){
+			this.filters[0] = new float[(int)properties.get("filters.layers.0")][];
+			for(int i = 0; i < this.filters[0].length; i++){
+				this.filters[0][i] = new float[this.filterSize * this.inputDepth];
+			}
 		}
 		// init layers and filters after the first layer
 		for(int i = 1; i < this.filters.length; i++){
