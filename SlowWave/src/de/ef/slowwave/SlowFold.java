@@ -3,7 +3,6 @@ package de.ef.slowwave;
 import java.util.Map;
 
 import de.ef.neuralnetworks.ConvolutionalNeuralNetwork;
-import de.ef.slowwave.pipeline.FloatArrayBufferFactory;
 
 public class SlowFold
 	implements ConvolutionalNeuralNetwork<float[], double[], double[]>{
@@ -12,8 +11,8 @@ public class SlowFold
 	int inputWidth, inputHeight, inputSize, inputDepth;
 	int filterWidth, filterHeight, filterSize, filterWidthPadding, filterHeightPadding;
 	float filters[][][]; // TODO bias in filters
-	private FloatArrayBufferFactory buffers;
-	private double[] filterOutputBuffer;
+	float filterLayers[][], filterErrors[][];
+	private double[] filterOutputs;
 	boolean poolDownSample;
 	
 	SlowWave fullyConnected;
@@ -63,10 +62,17 @@ public class SlowFold
 		// other options
 		this.poolDownSample = (boolean)properties.getOrDefault("filters.pool.last-layer", false);
 		
-		// init buffers
-		this.buffers = new FloatArrayBufferFactory(2);
-		int depth = (this.filters.length > 0 ? this.filters[this.filters.length - 1].length : this.inputDepth);
-		this.filterOutputBuffer = new double[
+		// filter layers
+		this.filterLayers = new float[this.filters.length][];
+		this.filterErrors = new float[this.filters.length][];
+		int depth = this.inputDepth;
+		for(int i = 0; i < this.filters.length; i++){
+			depth = this.filters[i].length;
+			this.filterLayers[i] = new float[this.inputSize * depth];
+			this.filterErrors[i] = new float[this.inputSize * depth];
+		}
+		
+		this.filterOutputs = new double[
 			(this.inputWidth * this.inputHeight) / (this.poolDownSample ? 4 : 1) * depth
 		];
 	}
@@ -75,12 +81,10 @@ public class SlowFold
 	@Override
 	public double[] calculateFilters(float inputs[]){
 		int activationIndex;
-		float activationMap[];
 		
 		int depth = this.inputDepth;
 		for(int i = 0; i < this.filters.length; i++){
 			activationIndex = 0;
-			activationMap = this.buffers.getBuffer(this.inputSize * this.filters[i].length, false);
 			
 			for(int j = 0; j < this.filters[i].length; j++){
 				for(int y = 0; y < this.inputHeight; y++){
@@ -100,16 +104,16 @@ public class SlowFold
 							}
 						}
 						// directly apply rectified linear units to activation map
-						activationMap[activationIndex++] = Math.max(sum, 0);
+						this.filterLayers[i][activationIndex++] = Math.max(sum, 0);
 					}
 				}
 			}
 			
-			inputs = activationMap;
+			inputs = this.filterLayers[i];
 			depth = this.filters[i].length;
 		}
 		
-		double outputs[] = this.filterOutputBuffer;
+		double outputs[] = this.filterOutputs;
 		if(this.poolDownSample == true){
 			// use maximum pooling
 			for(int d = 0, offset = 0, index = 0; d < depth; d++, offset += this.inputSize){
