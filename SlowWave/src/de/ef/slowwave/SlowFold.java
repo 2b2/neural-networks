@@ -156,8 +156,68 @@ public class SlowFold
 		// train fully connected layers with filter forward pass
 		double totalError = this.fullyConnected.train(filterForward, outputs);
 		
-		// train filters
-		// FIXME train filters
+		// train filters // TODO handle maximum pooling
+		for(int i = this.filters.length - 1; i >= 0; i--){
+			for(int z = 0, index = 0; z < this.filters[i].length; z++){
+				for(int y = 0; y < this.inputHeight; y++){
+					for(int x = 0; x < this.inputWidth; x++, index++){
+						float lastError = 0;
+						if(i + 1 == this.filters.length){
+							for(int k = 0; k < this.fullyConnected.layers[1].length; k++){
+								lastError +=
+									this.fullyConnected.layers[1][k].getError()
+									* this.fullyConnected.layers[1][k].getWeight(index);
+							}
+						}
+						else{
+							for(int filterY = 0, filterIndex = 0; filterY < this.filterHeight; filterY++){
+								for(int filterX = 0; filterX < this.filterWidth; filterX++, filterIndex++){
+									int realX = x + filterX - this.filterWidthPadding;
+									int realY = y + filterY - this.filterHeightPadding;
+									
+									if(realX >= 0 && realX < this.inputWidth && realY >= 0 && realY < this.inputHeight){
+										for(int k = 0; k < this.filters[i + 1].length; k++){
+											lastError +=
+												this.filterErrors[i + 1][realX + (realY * this.inputWidth) + (k * this.inputSize)]
+												* this.filters[i + 1][k][filterIndex];
+										}
+									}	
+								}
+							}
+						}
+						
+						this.filterErrors[i][index] = (
+							this.filterLayers[i][index]
+							* (1 - this.filterLayers[i][index])
+							* lastError
+						);
+						
+						int depth = (i == 0 ? this.inputDepth : this.filters[i - 1].length);
+						float[] previousLayer = (i == 0 ? inputs : this.filterLayers[i - 1]);
+						for(int k = 0; k < this.filters[i].length; k++){
+							for(int filterZ = 0, filterIndex = 0; filterZ < depth; filterZ++){
+								for(int filterY = 0; filterY < this.filterHeight; filterY++){
+									for(int filterX = 0; filterX < this.filterWidth; filterX++, filterIndex++){
+										int realX = x + filterX - this.filterWidthPadding;
+										int realY = y + filterY - this.filterHeightPadding;
+										
+										if(realX >= 0 && realX < this.inputWidth && realY >= 0 && realY < this.inputHeight){
+											this.filters[i][k][filterIndex] = (float)(
+												this.filters[i][k][filterIndex]
+												+ (this.fullyConnected.learningRate
+													* this.filterErrors[i][index]
+													* previousLayer[realX + (realY * this.inputWidth) + (filterZ * this.inputSize)]
+												)
+											);
+										}	
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 		
 		// use total error of fully connected layers as total error of this neural-network
 		return totalError;
