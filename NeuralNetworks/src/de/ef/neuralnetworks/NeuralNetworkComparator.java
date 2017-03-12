@@ -36,7 +36,7 @@ import java.util.function.Predicate;
  * @param I type of values to compare
  * 
  * @author Erik Fritzsche
- * @version 2.1
+ * @version 3.0
  * @since 1.0
  */
 public class NeuralNetworkComparator<I>
@@ -55,8 +55,8 @@ public class NeuralNetworkComparator<I>
 	
 	
 	
-	private final NeuralNetwork<Object, Object> equal, compare;
-	private final BiFunction<I, I, Object> inputConverter;
+	private final ConvolutionalNeuralNetwork<Object, Object, Object> equal, compare;
+	private final BiFunction<Object, Object, Object> inputConverter;
 	private final Function<Object, Float> outputConverter;
 	
 	private final Object notEqualCache, equalCache, lessThanCache, greaterThanCache;
@@ -71,12 +71,12 @@ public class NeuralNetworkComparator<I>
 	 */
 	@SuppressWarnings("unchecked")
 	public <C, O> NeuralNetworkComparator(
-			NeuralNetwork<C, O> equal, NeuralNetwork<C, O> compare,
-			BiFunction<I, I, C> inputConverter, Function<O, Float> outputConverter, Function<Float, O> reverseOutputConverter){
-		this.equal = (NeuralNetwork<Object, Object>)equal;
-		this.compare = (NeuralNetwork<Object, Object>)compare;
+			ConvolutionalNeuralNetwork<I, C, O> equal, ConvolutionalNeuralNetwork<I, C, O> compare,
+			BiFunction<C, C, C> inputConverter, Function<O, Float> outputConverter, Function<Float, O> reverseOutputConverter){
+		this.equal = (ConvolutionalNeuralNetwork<Object, Object, Object>)equal;
+		this.compare = (ConvolutionalNeuralNetwork<Object, Object, Object>)compare;
 		
-		this.inputConverter = (BiFunction<I, I, Object>)inputConverter;
+		this.inputConverter = (BiFunction<Object, Object, Object>)inputConverter;
 		this.outputConverter = (Function<Object, Float>)outputConverter;
 
 		this.notEqualCache    = reverseOutputConverter.apply(NOT_EQUAL);
@@ -89,12 +89,16 @@ public class NeuralNetworkComparator<I>
 	@Override
 	public int compare(I a, I b){
 		try{
-			Object input = this.inputConverter.apply(a, b); 
+			Object aFiltered = this.equal.calculateFilters(a), bFiltered = this.equal.calculateFilters(b);
+			Object input = this.inputConverter.apply(aFiltered, bFiltered); 
 			
-			if(this.outputConverter.apply(this.equal.calculate(input)) > E_THRESHOLD)
+			if(this.outputConverter.apply(this.equal.calculateFullyConnected(input)) > E_THRESHOLD)
 				return 0;
 			
-			if(this.outputConverter.apply(this.compare.calculate(input)) > GT_THRESHOLD)
+			aFiltered = this.compare.calculateFilters(a);
+			bFiltered = this.compare.calculateFilters(b);
+			input = this.inputConverter.apply(aFiltered, bFiltered);
+			if(this.outputConverter.apply(this.compare.calculateFullyConnected(input)) > GT_THRESHOLD)
 				return 1;
 			return -1;
 		}
