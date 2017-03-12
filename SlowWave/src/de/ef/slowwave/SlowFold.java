@@ -158,6 +158,15 @@ public class SlowFold
 		
 		// train filters // TODO handle maximum pooling
 		for(int i = this.filters.length - 1; i >= 0; i--){
+			float previousLayerAverage = 0f;
+			{
+				float previousLayer[] = (i == 0 ? inputs : this.filterLayers[i - 1]);
+				for(int j = 0; j < previousLayer.length; j++){
+					previousLayerAverage += previousLayer[j];
+				}
+				previousLayerAverage = previousLayerAverage / this.inputSize;
+			}
+			
 			for(int z = 0, index = 0; z < this.filters[i].length; z++){
 				for(int y = 0; y < this.inputHeight; y++){
 					for(int x = 0; x < this.inputWidth; x++, index++){
@@ -192,26 +201,16 @@ public class SlowFold
 							* lastError
 						);
 						
-						int depth = (i == 0 ? this.inputDepth : this.filters[i - 1].length);
-						float[] previousLayer = (i == 0 ? inputs : this.filterLayers[i - 1]);
 						for(int k = 0; k < this.filters[i].length; k++){
-							for(int filterZ = 0, filterIndex = 0; filterZ < depth; filterZ++){
-								for(int filterY = 0; filterY < this.filterHeight; filterY++){
-									for(int filterX = 0; filterX < this.filterWidth; filterX++, filterIndex++){
-										int realX = x + filterX - this.filterWidthPadding;
-										int realY = y + filterY - this.filterHeightPadding;
-										
-										if(realX >= 0 && realX < this.inputWidth && realY >= 0 && realY < this.inputHeight){
-											this.filters[i][k][filterIndex] = (float)(
-												this.filters[i][k][filterIndex]
-												+ (this.fullyConnected.learningRate
-													* this.filterErrors[i][index]
-													* previousLayer[realX + (realY * this.inputWidth) + (filterZ * this.inputSize)]
-												)
-											);
-										}	
-									}
-								}
+							for(int l = 0; l < this.filters[i][k].length; l++){
+								this.filters[i][k][l] = (float)(
+									this.filters[i][k][l]
+									+ (
+										this.fullyConnected.learningRate
+										* this.filterErrors[i][index]
+										* previousLayerAverage
+									)
+								);
 							}
 						}
 					}
