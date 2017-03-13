@@ -158,16 +158,7 @@ public class SlowFold
 		
 		// train filters // TODO handle maximum pooling
 		for(int i = this.filters.length - 1; i >= 0; i--){
-			float previousLayerAverage = 0f;
-			{
-				float previousLayer[] = (i == 0 ? inputs : this.filterLayers[i - 1]);
-				for(int j = 0; j < previousLayer.length; j++){
-					previousLayerAverage += previousLayer[j];
-				}
-				previousLayerAverage = previousLayerAverage / this.inputSize;
-			}
-			
-			for(int z = 0, index = 0; z < this.filters[i].length; z++){
+			for(int j = 0, index = 0; j < this.filters[i].length; j++){
 				for(int y = 0; y < this.inputHeight; y++){
 					for(int x = 0; x < this.inputWidth; x++, index++){
 						float lastError = 0;
@@ -200,19 +191,36 @@ public class SlowFold
 							* (1 - this.filterLayers[i][index])
 							* lastError
 						);
+					}
+				}
+				
+				float outputErrorSum = 0f;
+				final int previousDepth = (i == 0 ? this.inputDepth : this.filters[i - 1].length);
+				final float previousLayer[] = (i == 0 ? inputs : this.filterLayers[i - 1]);
+				for(int fY = 0, rfY = -this.filterHeightPadding; fY < this.filterHeight; fY++, rfY++){
+					for(int fX = 0, rfX = -this.filterWidthPadding; fX < this.filterWidth; fX++, rfX++){
+						int lowerBoundX = Math.max(rfX, 0);
+						int upperBoundX = this.inputWidth + Math.min(rfX, 0);
+						int lowerBoundY = Math.max(rfY, 0);
+						int upperBoundY = this.inputHeight + Math.min(rfY, 0);
 						
-						for(int k = 0; k < this.filters[i].length; k++){
-							for(int l = 0; l < this.filters[i][k].length; l++){
-								this.filters[i][k][l] = (float)(
-									this.filters[i][k][l]
-									+ (
-										this.fullyConnected.learningRate
-										* this.filterErrors[i][index]
-										* previousLayerAverage
-									)
-								);
+						for(int y = lowerBoundY; y < upperBoundY; y++){
+							for(int x = lowerBoundX; x < upperBoundX; x++){
+								for(int fZ = 0; fZ < previousDepth; fZ++){
+									outputErrorSum +=
+										this.filterErrors[i][(x - rfX) + ((y - rfY) * this.inputWidth) + (j * this.inputSize)]
+										* previousLayer[x + (y * this.inputWidth) + (fZ * this.inputSize)];
+								}
 							}
 						}
+						
+						this.filters[i][j][fX + (fY * this.filterWidth)] = (float)(
+							this.filters[i][j][fX + (fY * this.filterWidth)]
+							+ (
+								this.fullyConnected.learningRate
+								* (outputErrorSum / (this.inputSize * previousDepth))
+							)
+						);
 					}
 				}
 			}
