@@ -47,7 +47,7 @@ public class SlowFold
 			for(int i = 0; i < this.filters[0].length; i++){
 				this.filters[0][i] = new float[this.filterSize * this.inputDepth];
 				for(int k = 0; k < this.filters[0][i].length; k++){
-					this.filters[0][i][k] = (float)Math.random(); // TODO negative values
+					this.filters[0][i][k] = (float)(1 - (Math.random() * 2));
 				}
 			}
 		}
@@ -57,7 +57,7 @@ public class SlowFold
 			for(int j = 0; j < this.filters[i].length; j++){
 				this.filters[i][j] = new float[this.filterSize * this.filters[i - 1].length];
 				for(int k = 0; k < this.filters[i][j].length; k++){
-					this.filters[i][j][k] = (float)Math.random(); // TODO negative values
+					this.filters[i][j][k] = (float)(1 - (Math.random() * 2));
 				}
 			}
 		}
