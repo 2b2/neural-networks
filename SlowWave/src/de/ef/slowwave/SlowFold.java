@@ -46,6 +46,9 @@ public class SlowFold
 			this.filters[0] = new float[(int)properties.get("filters.layers.0")][];
 			for(int i = 0; i < this.filters[0].length; i++){
 				this.filters[0][i] = new float[this.filterSize * this.inputDepth];
+				for(int k = 0; k < this.filters[0][i].length; k++){
+					this.filters[0][i][k] = (float)Math.random(); // TODO negative values
+				}
 			}
 		}
 		// init layers and filters after the first layer
@@ -106,7 +109,7 @@ public class SlowFold
 							}
 						}
 						// directly apply rectified linear units to activation map
-						this.filterLayers[i][x + (y * this.inputWidth) + (j * this.inputSize)] = Math.max(sum, 0);
+						this.filterLayers[i][x + (y * this.inputWidth) + (j * this.inputSize)] = sum;//Math.max(sum, 0);
 					}
 				}
 			}
@@ -162,27 +165,35 @@ public class SlowFold
 			for(int j = 0, index = 0; j < this.filters[i].length; j++){
 				for(int y = 0; y < this.inputHeight; y++){
 					for(int x = 0; x < this.inputWidth; x++, index++){
-						float lastError = 0;
+						float errorSum = 0;
 						if(i + 1 == this.filters.length){
 							for(int k = 0; k < this.fullyConnected.layers[1].length; k++){
-								lastError +=
+								errorSum +=
 									this.fullyConnected.layers[1][k].getError()
 									* this.fullyConnected.layers[1][k].getWeight(index);
 							}
 						}
 						else{
-							for(int filterY = 0, filterIndex = 0; filterY < this.filterHeight; filterY++){
-								for(int filterX = 0; filterX < this.filterWidth; filterX++, filterIndex++){
-									int realX = x + filterX - this.filterWidthPadding;
-									int realY = y + filterY - this.filterHeightPadding;
-									
-									if(realX >= 0 && realX < this.inputWidth && realY >= 0 && realY < this.inputHeight){
-										for(int k = 0; k < this.filters[i + 1].length; k++){
-											lastError +=
-												this.filterErrors[i + 1][realX + (realY * this.inputWidth) + (k * this.inputSize)]
-												* this.filters[i + 1][k][filterIndex];
-										}
-									}	
+							int lowerBoundX = x - this.filterWidthPadding < 0 ? -(x - this.filterWidthPadding) : 0;
+							int upperBoundX = this.filterWidth + (
+								x + this.filterWidthPadding >= this.inputWidth
+								? (this.inputWidth - (x + this.filterWidthPadding + 1))
+								: 0
+							);
+							int lowerBoundY = y - this.filterHeightPadding < 0 ? -(y - this.filterHeightPadding) : 0;
+							int upperBoundY = this.filterHeight + (
+								y + this.filterHeightPadding >= this.inputHeight
+								? (this.inputHeight - (y + this.filterHeightPadding + 1))
+								: 0
+							);
+							
+							for(int fY = lowerBoundY, rY = y + (fY - this.filterHeightPadding); fY < upperBoundY; fY++, rY++){
+								for(int fX = lowerBoundX, rX = x + (fX - this.filterWidthPadding); fX < upperBoundX; fX++, rX++){
+									for(int k = 0; k < this.filters[i + 1].length; k++){
+										errorSum +=
+											this.filterErrors[i + 1][rX + (rY * this.inputWidth) + (k * this.inputSize)]
+											* this.filters[i + 1][k][fX + (fY * this.filterWidth) + (k * this.filterSize)];
+									}
 								}
 							}
 						}
@@ -190,7 +201,7 @@ public class SlowFold
 						this.filterErrors[i][index] = (
 							this.filterLayers[i][index]
 							* (1 - this.filterLayers[i][index])
-							* lastError
+							* errorSum
 						);
 					}
 				}
