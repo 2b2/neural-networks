@@ -80,37 +80,38 @@ public class SlowFold
 	
 	@Override
 	public double[] calculateFilters(float inputs[]){
-		int activationIndex;
-		
 		int depth = this.inputDepth;
-		for(int i = 0; i < this.filters.length; i++){
-			activationIndex = 0;
-			
+		for(int i = 0; i < this.filters.length; depth = this.filters[i++].length){
 			for(int j = 0; j < this.filters[i].length; j++){
 				for(int y = 0; y < this.inputHeight; y++){
 					for(int x = 0; x < this.inputWidth; x++){
 						float sum = 0;
-						for(int filterY = 0; filterY < this.filterHeight; filterY++){
-							for(int filterX = 0; filterX < this.filterWidth; filterX++){
-								int realX = x + filterX - this.filterWidthPadding, realY = y + filterY - this.filterHeightPadding;
-								
-								if(realX >= 0 && realX < this.inputWidth && realY >= 0 && realY < this.inputHeight){
-									for(int k = 0; k < depth; k++){
-										sum +=
-											inputs[(k * this.inputSize) + (realX + realY * this.inputWidth)]
-											* this.filters[i][j][(k * this.filterSize) + (filterX + filterY * this.filterWidth)];
-									}
+
+						int lowerBoundX = x - this.filterWidthPadding < 0 ? -(x - this.filterWidthPadding) : 0;
+						int upperBoundX = this.filterWidth + (
+							x + this.filterWidthPadding >= this.inputWidth ? (this.inputWidth - (x + this.filterWidthPadding + 1)) : 0
+						);
+						int lowerBoundY = y - this.filterHeightPadding < 0 ? -(y - this.filterHeightPadding) : 0;
+						int upperBoundY = this.filterHeight + (
+							y + this.filterHeightPadding >= this.inputHeight ? (this.inputHeight - (y + this.filterHeightPadding + 1)) : 0
+						);
+						
+						for(int fY = lowerBoundY, rY = y + (fY - this.filterHeightPadding); fY < upperBoundY; fY++, rY++){
+							for(int fX = lowerBoundX, rX = x + (fX - this.filterWidthPadding); fX < upperBoundX; fX++, rX++){
+								for(int fZ = 0; fZ < depth; fZ++){
+									sum +=
+										inputs[rX + (rY * this.inputWidth) + (fZ * this.inputSize)]
+										* this.filters[i][j][fX + (fY * this.filterWidth) + (fZ * this.filterSize)];
 								}
 							}
 						}
 						// directly apply rectified linear units to activation map
-						this.filterLayers[i][activationIndex++] = Math.max(sum, 0);
+						this.filterLayers[i][x + (y * this.inputWidth) + (j * this.inputSize)] = Math.max(sum, 0);
 					}
 				}
 			}
 			
 			inputs = this.filterLayers[i];
-			depth = this.filters[i].length;
 		}
 		
 		double outputs[] = this.filterOutputs;
@@ -194,7 +195,6 @@ public class SlowFold
 					}
 				}
 				
-				float outputErrorSum = 0f;
 				final int previousDepth = (i == 0 ? this.inputDepth : this.filters[i - 1].length);
 				final float previousLayer[] = (i == 0 ? inputs : this.filterLayers[i - 1]);
 				for(int fY = 0, rfY = -this.filterHeightPadding; fY < this.filterHeight; fY++, rfY++){
@@ -204,23 +204,24 @@ public class SlowFold
 						int lowerBoundY = Math.max(rfY, 0);
 						int upperBoundY = this.inputHeight + Math.min(rfY, 0);
 						
-						for(int y = lowerBoundY; y < upperBoundY; y++){
-							for(int x = lowerBoundX; x < upperBoundX; x++){
-								for(int fZ = 0; fZ < previousDepth; fZ++){
+						for(int fZ = 0; fZ < previousDepth; fZ++){
+							float outputErrorSum = 0f;
+							for(int y = lowerBoundY; y < upperBoundY; y++){
+								for(int x = lowerBoundX; x < upperBoundX; x++){
 									outputErrorSum +=
 										this.filterErrors[i][(x - rfX) + ((y - rfY) * this.inputWidth) + (j * this.inputSize)]
 										* previousLayer[x + (y * this.inputWidth) + (fZ * this.inputSize)];
 								}
 							}
+							
+							this.filters[i][j][fX + (fY * this.filterWidth) + (fZ * this.filterSize)] = (float)(
+								this.filters[i][j][fX + (fY * this.filterWidth) + (fZ * this.filterSize)]
+								+ (
+									this.fullyConnected.learningRate
+									* (outputErrorSum / (this.inputSize * previousDepth))
+								)
+							);
 						}
-						
-						this.filters[i][j][fX + (fY * this.filterWidth)] = (float)(
-							this.filters[i][j][fX + (fY * this.filterWidth)]
-							+ (
-								this.fullyConnected.learningRate
-								* (outputErrorSum / (this.inputSize * previousDepth))
-							)
-						);
 					}
 				}
 			}
