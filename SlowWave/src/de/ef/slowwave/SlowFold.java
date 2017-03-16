@@ -1,5 +1,7 @@
 package de.ef.slowwave;
 
+import java.io.Serializable;
+import java.util.Locale;
 import java.util.Map;
 
 import de.ef.neuralnetworks.ConvolutionalNeuralNetwork;
@@ -10,10 +12,8 @@ public class SlowFold
 	
 	int inputWidth, inputHeight, inputSize, inputDepth;
 	int filterWidth, filterHeight, filterSize, filterWidthPadding, filterHeightPadding;
-	float filters[][][]; // TODO bias in filters
-	float filterLayers[][], filterErrors[][];
-	private double[] filterOutputs;
-	boolean poolDownSample;
+	FilterLayer filterLayers[]; // TODO bias in filters
+	private double filterOutputs[];
 	
 	SlowWave fullyConnected;
 	
@@ -23,9 +23,6 @@ public class SlowFold
 	
 	@Override
 	public void init(int inputSize, int hiddenSizes[], int outputSize, Map<String, Object> properties){
-		this.fullyConnected = new SlowWave();
-		this.fullyConnected.init(inputSize, hiddenSizes, outputSize, properties);
-		
 		// TODO hardcoded
 		this.filterWidth = (int)properties.getOrDefault("filters.width", 5); // TODO throw exception if width is even
 		this.filterHeight = (int)properties.getOrDefault("filters.height", 5); // TODO throw exception if height is even
@@ -33,7 +30,6 @@ public class SlowFold
 		
 		this.filterWidthPadding = (this.filterWidth - 1) / 2;
 		this.filterHeightPadding = (this.filterHeight - 1) / 2;
-		this.filters = new float[(int)properties.get("filters.layers.count")][][];
 		
 		// setup input dimensions
 		this.inputDepth = (int)properties.getOrDefault("input.depth", 1);
@@ -41,127 +37,60 @@ public class SlowFold
 		this.inputHeight = inputSize / (this.inputDepth * this.inputWidth);
 		this.inputSize = this.inputWidth * this.inputHeight;
 		
-		// init first layer
-		if(this.filters.length > 0){
-			this.filters[0] = new float[(int)properties.get("filters.layers.0")][];
-			for(int i = 0; i < this.filters[0].length; i++){
-				this.filters[0][i] = new float[this.filterSize * this.inputDepth + 2];
+		// init filter layers
+		this.filterLayers = new FilterLayer[(int)properties.get("filters.layers.count")];
+		
+		int previousWidth = this.inputWidth, previousHeight = this.inputHeight, previousDepth = this.inputDepth;
+		for(int i = 0; i < this.filterLayers.length; previousDepth = this.filterLayers[i++].filters.length){
+			float filters[][] = new float[(int)properties.get("filters.layers." + i)][];
+			for(int j = 0; j < filters.length; j++){
+				filters[j] = new float[this.filterSize * previousDepth + 2];
 				
 				float filterMin = 0f, filterMax = 0f;
-				for(int k = 0; k + 2 < this.filters[0][i].length; k++){
-					float weight = (this.filters[0][i][k] = (float)(1 - (Math.random() * 2)));
+				for(int k = 0; k + 2 < filters[j].length; k++){
+					float weight = (filters[j][k] = (float)(1 - (Math.random() * 2)));
 					if(weight < 0)
 						filterMin += weight;
 					else
 						filterMax += weight;
 				}
-				this.filters[0][i][this.filters[0][i].length - 2] = filterMin;
-				this.filters[0][i][this.filters[0][i].length - 1] = filterMax;
-			}
-		}
-		// init layers and filters after the first layer
-		for(int i = 1; i < this.filters.length; i++){
-			this.filters[i] = new float[(int)properties.get("filters.layers." + i)][];
-			for(int j = 0; j < this.filters[i].length; j++){
-				this.filters[i][j] = new float[this.filterSize * this.filters[i - 1].length + 2];
 				
-				float filterMin = 0f, filterMax = 0f;
-				for(int k = 0; k + 2 < this.filters[i][j].length; k++){
-					float weight = (this.filters[i][j][k] = (float)(1 - (Math.random() * 2)));
-					if(weight < 0)
-						filterMin += weight;
-					else
-						filterMax += weight;
-				}
-				this.filters[i][j][this.filters[i][j].length - 2] = filterMin;
-				this.filters[i][j][this.filters[i][j].length - 1] = filterMax;
+				// set minimal and maximal output of filter (assuming an an input between 0 and 1)
+				filters[j][filters[j].length - 2] = filterMin;
+				filters[j][filters[j].length - 1] = filterMax;
 			}
+			
+			Object poolingModeObject =
+				properties.getOrDefault("filters.layers." + i + ".pooling.mode", PoolingMode.NONE);
+			PoolingMode poolingMode =
+				poolingModeObject instanceof PoolingMode
+				? (PoolingMode)poolingModeObject
+				: PoolingMode.valueOf(((String)poolingModeObject).toUpperCase(Locale.ENGLISH));
+			
+			this.filterLayers[i] =
+				new FilterLayer(filters, poolingMode, previousWidth, previousHeight, previousDepth);
+			
+			previousWidth = this.filterLayers[i].width;
+			previousHeight = this.filterLayers[i].height;
 		}
 		
-		// other options
-		this.poolDownSample = (boolean)properties.getOrDefault("filters.pool.last-layer", false);
+		this.filterOutputs = new double[previousWidth * previousHeight * previousDepth]; // TODO handle pooling after last layer
 		
-		// filter layers
-		this.filterLayers = new float[this.filters.length][];
-		this.filterErrors = new float[this.filters.length][];
-		int depth = this.inputDepth;
-		for(int i = 0; i < this.filters.length; i++){
-			depth = this.filters[i].length;
-			this.filterLayers[i] = new float[this.inputSize * depth];
-			this.filterErrors[i] = new float[this.inputSize * depth];
-		}
-		
-		this.filterOutputs = new double[
-			(this.inputWidth * this.inputHeight) / (this.poolDownSample ? 4 : 1) * depth
-		];
+		// init fully connected layers
+		this.fullyConnected = new SlowWave();
+		this.fullyConnected.init(this.filterOutputs.length, hiddenSizes, outputSize, properties);
 	}
 	
 	
 	@Override
 	public double[] calculateFilters(float inputs[]){
-		int depth = this.inputDepth;
-		for(int i = 0; i < this.filters.length; depth = this.filters[i++].length){
-			for(int j = 0; j < this.filters[i].length; j++){
-				for(int y = 0; y < this.inputHeight; y++){
-					for(int x = 0; x < this.inputWidth; x++){
-						float sum = 0;
-
-						int lowerBoundX = x - this.filterWidthPadding < 0 ? -(x - this.filterWidthPadding) : 0;
-						int upperBoundX = this.filterWidth + (
-							x + this.filterWidthPadding >= this.inputWidth ? (this.inputWidth - (x + this.filterWidthPadding + 1)) : 0
-						);
-						int lowerBoundY = y - this.filterHeightPadding < 0 ? -(y - this.filterHeightPadding) : 0;
-						int upperBoundY = this.filterHeight + (
-							y + this.filterHeightPadding >= this.inputHeight ? (this.inputHeight - (y + this.filterHeightPadding + 1)) : 0
-						);
-						
-						for(int fY = lowerBoundY, rY = y + (fY - this.filterHeightPadding); fY < upperBoundY; fY++, rY++){
-							for(int fX = lowerBoundX, rX = x + (fX - this.filterWidthPadding); fX < upperBoundX; fX++, rX++){
-								for(int fZ = 0; fZ < depth; fZ++){
-									sum +=
-										inputs[rX + (rY * this.inputWidth) + (fZ * this.inputSize)]
-										* this.filters[i][j][fX + (fY * this.filterWidth) + (fZ * this.filterSize)];
-								}
-							}
-						}
-						
-						// map sum between filter minimum and maximum to an output between 0 and 1
-						float filterMin = this.filters[i][j][this.filters[i][j].length - 2];
-						float filterMax = this.filters[i][j][this.filters[i][j].length - 1];
-						
-						this.filterLayers[i][x + (y * this.inputWidth) + (j * this.inputSize)] =
-							((sum - filterMin) / (filterMax - filterMin));
-					}
-				}
-			}
-			
-			inputs = this.filterLayers[i];
+		for(int i = 0; i < this.filterLayers.length; i++){
+			inputs = this.filterLayers[i].calculate(inputs);
 		}
 		
 		double outputs[] = this.filterOutputs;
-		if(this.poolDownSample == true){
-			// use maximum pooling
-			for(int d = 0, offset = 0, index = 0; d < depth; d++, offset += this.inputSize){
-				for(int y = 0; y + 1 < this.inputHeight; y += 2){
-					for(int x = 0; x + 1 < this.inputWidth; x += 2, index++){
-						outputs[index] = (double)Math.max(
-							inputs[offset + (x + y * this.inputWidth)],
-							Math.max(
-								inputs[offset + ((x + 1) + y * this.inputWidth)],
-								Math.max(
-									inputs[offset + (x + (y + 1) * this.inputWidth)],
-									inputs[offset + ((x + 1) + (y + 1) * this.inputWidth)]
-								)
-							)
-						);
-					}
-				}
-			}
-		}
-		else{
-			for(int i = 0; i < outputs.length; i++){
-				outputs[i] = (double)inputs[i];
-			}
+		for(int i = 0; i < outputs.length; i++){
+			outputs[i] = (double)inputs[i];
 		}
 		
 		return outputs;
@@ -181,77 +110,245 @@ public class SlowFold
 		// train fully connected layers with filter forward pass
 		double totalError = this.fullyConnected.train(filterForward, outputs);
 		
-		// train filters // TODO handle maximum pooling
-		for(int i = this.filters.length - 1; i >= 0; i--){
-			for(int j = 0, index = 0; j < this.filters[i].length; j++){
-				for(int y = 0; y < this.inputHeight; y++){
-					for(int x = 0; x < this.inputWidth; x++, index++){
-						float errorSum = 0;
-						if(i + 1 == this.filters.length){
+		// train filters // TODO handle pooling after last layer
+		for(int i = this.filterLayers.length - 1; i >= 0; i--){
+			float filters[][] = this.filterLayers[i].filters;
+			
+			if(i + 1 == this.filterLayers.length){
+				for(int z = 0, index = 0; z < filters.length; z++){
+					for(int y = 0; y < this.filterLayers[i].height; y++){
+						for(int x = 0; x < this.filterLayers[i].width; x++, index++){
+							float errorSum = 0;
 							for(int k = 0; k < this.fullyConnected.layers[1].length; k++){
 								errorSum +=
 									this.fullyConnected.layers[1][k].getError()
 									* this.fullyConnected.layers[1][k].getWeight(index);
 							}
-						}
-						else{
-							int lowerBoundX = x - this.filterWidthPadding < 0 ? -(x - this.filterWidthPadding) : 0;
-							int upperBoundX = this.filterWidth + (
-								x + this.filterWidthPadding >= this.inputWidth
-								? (this.inputWidth - (x + this.filterWidthPadding + 1))
-								: 0
-							);
-							int lowerBoundY = y - this.filterHeightPadding < 0 ? -(y - this.filterHeightPadding) : 0;
-							int upperBoundY = this.filterHeight + (
-								y + this.filterHeightPadding >= this.inputHeight
-								? (this.inputHeight - (y + this.filterHeightPadding + 1))
-								: 0
-							);
 							
-							for(int fY = lowerBoundY, rY = y + (fY - this.filterHeightPadding); fY < upperBoundY; fY++, rY++){
-								for(int fX = lowerBoundX, rX = x + (fX - this.filterWidthPadding); fX < upperBoundX; fX++, rX++){
-									for(int k = 0; k < this.filters[i + 1].length; k++){
-										errorSum +=
-											this.filterErrors[i + 1][rX + (rY * this.inputWidth) + (k * this.inputSize)]
-											* this.filters[i + 1][k][fX + (fY * this.filterWidth) + (k * this.filterSize)];
+							this.filterLayers[i].errors[index] = (
+								this.filterLayers[i].outputs[index]
+								* (1 - this.filterLayers[i].outputs[index])
+								* errorSum
+							);
+						}
+					}
+				}
+			}
+			else{
+				this.filterLayers[i].calculateErrors(
+					this.filterLayers[i + 1].errors, this.filterLayers[i + 1].filters,
+					this.filterLayers[i + 1].width, this.filterLayers[i + 1].height
+				);
+			}
+			
+			if(i == 0)
+				this.filterLayers[0].train(inputs, this.inputDepth);
+			else
+				this.filterLayers[i].train(this.filterLayers[i - 1].outputs, this.filterLayers[i - 1].filters.length);
+		}
+		
+		// use total error of fully connected layers as total error of this neural-network
+		return totalError;
+	}
+	
+	
+	
+	public static enum PoolingMode{
+		
+		NONE, AVERAGE, MAXIMUM
+	}
+	
+	private class FilterLayer
+		implements Serializable{
+		
+		private final float filters[][], outputs[], errors[];
+		private final int width, height, size, filterDepth;
+		private final PoolingMode poolingMode;
+		
+		
+		private FilterLayer(float filters[][], PoolingMode poolingMode, int width, int height, int filterDepth){
+			this.filters = filters;
+			
+			this.poolingMode = poolingMode;
+			
+			if(this.poolingMode == PoolingMode.NONE){
+				this.width = width;
+				this.height = height;
+			}
+			else{
+				// TODO throw exception if width or height is not divisible by 2
+				this.width = width / 2;
+				this.height = height / 2;
+			}
+			this.size = this.width * this.height;
+			this.filterDepth = filterDepth;
+			
+			this.outputs = new float[this.width * this.height * this.filters.length];
+			this.errors = new float[this.width * this.height * this.filters.length];
+		}
+		
+		
+		private float[] calculate(float inputs[]){
+			for(int j = 0; j < this.filters.length; j++){
+				for(int y = 0; y < this.height; y++){
+					for(int x = 0; x < this.width; x++){
+						float sum = 0;
+
+						int lowerBoundX = x - SlowFold.this.filterWidthPadding < 0 ? -(x - SlowFold.this.filterWidthPadding) : 0;
+						int upperBoundX = SlowFold.this.filterWidth + (
+							x + SlowFold.this.filterWidthPadding >= this.width
+							? (this.width - (x + SlowFold.this.filterWidthPadding + 1))
+							: 0
+						);
+						int lowerBoundY = y - SlowFold.this.filterHeightPadding < 0 ? -(y - SlowFold.this.filterHeightPadding) : 0;
+						int upperBoundY = SlowFold.this.filterHeight + (
+							y + SlowFold.this.filterHeightPadding >= this.height
+							? (this.height - (y + SlowFold.this.filterHeightPadding + 1))
+							: 0
+						);
+						
+						for(int fY = lowerBoundY, rY = y + (fY - SlowFold.this.filterHeightPadding); fY < upperBoundY; fY++, rY++){
+							for(int fX = lowerBoundX, rX = x + (fX - SlowFold.this.filterWidthPadding); fX < upperBoundX; fX++, rX++){
+								for(int fZ = 0; fZ < this.filterDepth; fZ++){
+									// TODO maybe put switch outside loop to optimize
+									float value;
+									switch(this.poolingMode){
+										case AVERAGE:
+											value = (
+												inputs[2 * rX + (2 * rY * this.width) + (fZ * this.size)]
+												+ inputs[2 * rX + ((2 * rY + 1) * this.width) + (fZ * this.size)]
+												+ inputs[(2 * rX + 1) + (2 * rY * this.width) + (fZ * this.size)]
+												+ inputs[(2 * rX + 1) + ((2 * rY + 1) * this.width) + (fZ * this.size)]
+											) / 4;
+											break;
+										case MAXIMUM:
+											value = Math.max(
+												inputs[2 * rX + (2 * rY * this.width) + (fZ * this.size)],
+												Math.max(
+													inputs[2 * rX + ((2 * rY + 1) * this.width) + (fZ * this.size)],
+													Math.max(
+														inputs[(2 * rX + 1) + (2 * rY * this.width) + (fZ * this.size)],
+														inputs[(2 * rX + 1) + ((2 * rY + 1) * this.width) + (fZ * this.size)]
+													)
+												)
+											);
+											break;
+										default:
+											value = inputs[rX + (rY * this.width) + (fZ * this.size)];
 									}
+									
+									sum +=
+										value * this.filters[j][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)];
 								}
 							}
 						}
 						
-						this.filterErrors[i][index] = (
-							this.filterLayers[i][index]
-							* (1 - this.filterLayers[i][index])
-							* errorSum
-						);
+						// map sum between filter minimum and maximum to an output between 0 and 1
+						float filterMin = this.filters[j][this.filters[j].length - 2];
+						float filterMax = this.filters[j][this.filters[j].length - 1];
+						
+						this.outputs[x + (y * this.width) + (j * this.size)] =
+							((sum - filterMin) / (filterMax - filterMin));
 					}
 				}
-				
-				final int previousDepth = (i == 0 ? this.inputDepth : this.filters[i - 1].length);
-				final float previousLayer[] = (i == 0 ? inputs : this.filterLayers[i - 1]);
-				
+			}
+			
+			return this.outputs;
+		}
+		
+		
+		private void calculateErrors(float nextErrors[], float nextFilters[][], final int nextWidth, final int nextHeight){
+			final int nextSize = nextWidth * nextHeight;
+			final boolean nextScaled = this.size != nextWidth;
+			
+			for(int i = 0, index = 0; i < this.filters.length; i++){
+				for(int y = 0; y < this.height; y++){
+					for(int x = 0; x < this.width; x++, index++){
+						float errorSum = 0;
+						
+						int lowerBoundX = x - SlowFold.this.filterWidthPadding < 0 ? -(x - SlowFold.this.filterWidthPadding) : 0;
+						int upperBoundX = SlowFold.this.filterWidth + (
+							x + SlowFold.this.filterWidthPadding >= this.width
+							? (this.width - (x + SlowFold.this.filterWidthPadding + 1))
+							: 0
+						);
+						int lowerBoundY = y - SlowFold.this.filterHeightPadding < 0 ? -(y - SlowFold.this.filterHeightPadding) : 0;
+						int upperBoundY = SlowFold.this.filterHeight + (
+							y + SlowFold.this.filterHeightPadding >= this.height
+							? (this.height - (y + SlowFold.this.filterHeightPadding + 1))
+							: 0
+						);
+						
+						for(int fY = lowerBoundY, rY = y + (fY - SlowFold.this.filterHeightPadding); fY < upperBoundY; fY++, rY++){
+							for(int fX = lowerBoundX, rX = x + (fX - SlowFold.this.filterWidthPadding); fX < upperBoundX; fX++, rX++){
+								for(int j = 0; j < nextFilters.length; j++){
+									errorSum +=
+										(
+											nextScaled == true
+											? nextErrors[(rX / 2) + ((rY / 2) * nextWidth) + (j * nextSize)]
+											: nextErrors[rX + (rY * nextWidth) + (j * nextSize)]
+										)
+										* nextFilters[j][fX + (fY * SlowFold.this.filterWidth) + (j * SlowFold.this.filterSize)];
+								}
+							}
+						}
+						
+						this.errors[index] = (this.outputs[index] * (1 - this.outputs[index]) * errorSum);
+					}
+				}
+			}
+		}
+		
+		private void train(float previousOutputs[], int previousDepth){
+			for(int i = 0; i < this.filters.length; i++){
 				float filterMin = 0f, filterMax = 0f;
-				for(int fY = 0, rfY = -this.filterHeightPadding; fY < this.filterHeight; fY++, rfY++){
-					for(int fX = 0, rfX = -this.filterWidthPadding; fX < this.filterWidth; fX++, rfX++){
+				for(int fY = 0, rfY = -SlowFold.this.filterHeightPadding; fY < SlowFold.this.filterHeight; fY++, rfY++){
+					for(int fX = 0, rfX = -SlowFold.this.filterWidthPadding; fX < SlowFold.this.filterWidth; fX++, rfX++){
 						int lowerBoundX = Math.max(rfX, 0);
-						int upperBoundX = this.inputWidth + Math.min(rfX, 0);
+						int upperBoundX = this.width + Math.min(rfX, 0);
 						int lowerBoundY = Math.max(rfY, 0);
-						int upperBoundY = this.inputHeight + Math.min(rfY, 0);
+						int upperBoundY = this.height + Math.min(rfY, 0);
 						
 						for(int fZ = 0; fZ < previousDepth; fZ++){
 							float outputErrorSum = 0f;
 							for(int y = lowerBoundY; y < upperBoundY; y++){
 								for(int x = lowerBoundX; x < upperBoundX; x++){
+									// TODO maybe put switch outside loop to optimize
+									float value;
+									switch(this.poolingMode){
+										case AVERAGE:
+											value = (
+												previousOutputs[2 * x + (2 * y * this.width) + (fZ * this.size)]
+												+ previousOutputs[2 * x + ((2 * y + 1) * this.width) + (fZ * this.size)]
+												+ previousOutputs[(2 * x + 1) + (2 * y * this.width) + (fZ * this.size)]
+												+ previousOutputs[(2 * x + 1) + ((2 * y + 1) * this.width) + (fZ * this.size)]
+											) / 4;
+											break;
+										case MAXIMUM:
+											value = Math.max(
+												previousOutputs[2 * x + (2 * y * this.width) + (fZ * this.size)],
+												Math.max(
+													previousOutputs[2 * x + ((2 * y + 1) * this.width) + (fZ * this.size)],
+													Math.max(
+														previousOutputs[(2 * x + 1) + (2 * y * this.width) + (fZ * this.size)],
+														previousOutputs[(2 * x + 1) + ((2 * y + 1) * this.width) + (fZ * this.size)]
+													)
+												)
+											);
+											break;
+										default:
+											value = previousOutputs[x + (y * this.width) + (fZ * this.size)];
+									}
+									
 									outputErrorSum +=
-										this.filterErrors[i][(x - rfX) + ((y - rfY) * this.inputWidth) + (j * this.inputSize)]
-										* previousLayer[x + (y * this.inputWidth) + (fZ * this.inputSize)];
+										value * this.errors[(x - rfX) + ((y - rfY) * this.width) + (i * this.size)];
 								}
 							}
 							
-							float weight = this.filters[i][j][fX + (fY * this.filterWidth) + (fZ * this.filterSize)] =
+							float weight = this.filters[i][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)] =
 								(float)(
-									this.filters[i][j][fX + (fY * this.filterWidth) + (fZ * this.filterSize)]
-									+ (this.fullyConnected.learningRate * outputErrorSum)
+									this.filters[i][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)]
+									+ (SlowFold.this.fullyConnected.learningRate * outputErrorSum)
 								);
 							
 							if(weight < 0)
@@ -263,12 +360,9 @@ public class SlowFold
 				}
 				
 				// update filter minimum and maximum
-				this.filters[i][j][this.filters[i][j].length - 2] = filterMin;
-				this.filters[i][j][this.filters[i][j].length - 1] = filterMax;
+				this.filters[i][this.filters[i].length - 2] = filterMin;
+				this.filters[i][this.filters[i].length - 1] = filterMax;
 			}
 		}
-		
-		// use total error of fully connected layers as total error of this neural-network
-		return totalError;
 	}
 }
