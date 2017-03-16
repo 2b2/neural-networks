@@ -155,8 +155,51 @@ public class SlowFold
 	
 	public static enum PoolingMode{
 		
-		NONE, AVERAGE, MAXIMUM
+		NONE((a, x, y, z, w, h, s) -> a[x + (y * w) + (z * s)]),
+		AVERAGE((a, x, y, z, w, h, s) ->
+			(
+				a[2 * x + (2 * y * w) + (z * s)]
+				+ a[2 * x + ((2 * y + 1) * w) + (z * s)]
+				+ a[(2 * x + 1) + (2 * y * w) + (z * s)]
+				+ a[(2 * x + 1) + ((2 * y + 1) * w) + (z * s)]
+			) / 4
+		),
+		MAXIMUM((a, x, y, z, w, h, s) ->
+			Math.max(
+				a[2 * x + (2 * y * w) + (z * s)],
+				Math.max(
+					a[2 * x + ((2 * y + 1) * w) + (z * s)],
+					Math.max(
+						a[(2 * x + 1) + (2 * y * w) + (z * s)],
+						a[(2 * x + 1) + ((2 * y + 1) * w) + (z * s)]
+					)
+				)
+			)
+		);
+		
+		
+		
+		private final PoolingCalculator calculator;
+		
+		
+		private PoolingMode(PoolingCalculator calculator){
+			this.calculator = calculator;
+		}
+		
+		
+		public float getValue(float array[], int x, int y, int z, int width, int height, int size){
+			return this.calculator.calculate(array, x, y, z, width, height, size);
+		}
+		
+		
+		
+		private interface PoolingCalculator{
+			
+			
+			public float calculate(float array[], int x, int y, int z, int width, int height, int size);
+		}
 	}
+	
 	
 	private class FilterLayer
 		implements Serializable{
@@ -210,35 +253,9 @@ public class SlowFold
 						for(int fY = lowerBoundY, rY = y + (fY - SlowFold.this.filterHeightPadding); fY < upperBoundY; fY++, rY++){
 							for(int fX = lowerBoundX, rX = x + (fX - SlowFold.this.filterWidthPadding); fX < upperBoundX; fX++, rX++){
 								for(int fZ = 0; fZ < this.filterDepth; fZ++){
-									// TODO maybe put switch outside loop to optimize
-									float value;
-									switch(this.poolingMode){
-										case AVERAGE:
-											value = (
-												inputs[2 * rX + (2 * rY * this.width) + (fZ * this.size)]
-												+ inputs[2 * rX + ((2 * rY + 1) * this.width) + (fZ * this.size)]
-												+ inputs[(2 * rX + 1) + (2 * rY * this.width) + (fZ * this.size)]
-												+ inputs[(2 * rX + 1) + ((2 * rY + 1) * this.width) + (fZ * this.size)]
-											) / 4;
-											break;
-										case MAXIMUM:
-											value = Math.max(
-												inputs[2 * rX + (2 * rY * this.width) + (fZ * this.size)],
-												Math.max(
-													inputs[2 * rX + ((2 * rY + 1) * this.width) + (fZ * this.size)],
-													Math.max(
-														inputs[(2 * rX + 1) + (2 * rY * this.width) + (fZ * this.size)],
-														inputs[(2 * rX + 1) + ((2 * rY + 1) * this.width) + (fZ * this.size)]
-													)
-												)
-											);
-											break;
-										default:
-											value = inputs[rX + (rY * this.width) + (fZ * this.size)];
-									}
-									
 									sum +=
-										value * this.filters[j][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)];
+										this.poolingMode.getValue(inputs, rX, rY, fZ, this.width, this.height, this.size)
+										* this.filters[j][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)];
 								}
 							}
 						}
@@ -313,35 +330,9 @@ public class SlowFold
 							float outputErrorSum = 0f;
 							for(int y = lowerBoundY; y < upperBoundY; y++){
 								for(int x = lowerBoundX; x < upperBoundX; x++){
-									// TODO maybe put switch outside loop to optimize
-									float value;
-									switch(this.poolingMode){
-										case AVERAGE:
-											value = (
-												previousOutputs[2 * x + (2 * y * this.width) + (fZ * this.size)]
-												+ previousOutputs[2 * x + ((2 * y + 1) * this.width) + (fZ * this.size)]
-												+ previousOutputs[(2 * x + 1) + (2 * y * this.width) + (fZ * this.size)]
-												+ previousOutputs[(2 * x + 1) + ((2 * y + 1) * this.width) + (fZ * this.size)]
-											) / 4;
-											break;
-										case MAXIMUM:
-											value = Math.max(
-												previousOutputs[2 * x + (2 * y * this.width) + (fZ * this.size)],
-												Math.max(
-													previousOutputs[2 * x + ((2 * y + 1) * this.width) + (fZ * this.size)],
-													Math.max(
-														previousOutputs[(2 * x + 1) + (2 * y * this.width) + (fZ * this.size)],
-														previousOutputs[(2 * x + 1) + ((2 * y + 1) * this.width) + (fZ * this.size)]
-													)
-												)
-											);
-											break;
-										default:
-											value = previousOutputs[x + (y * this.width) + (fZ * this.size)];
-									}
-									
 									outputErrorSum +=
-										value * this.errors[(x - rfX) + ((y - rfY) * this.width) + (i * this.size)];
+										this.poolingMode.getValue(previousOutputs, x, y, fZ, this.width, this.height, this.size)
+										* this.errors[(x - rfX) + ((y - rfY) * this.width) + (i * this.size)];
 								}
 							}
 							
