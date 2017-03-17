@@ -155,48 +155,39 @@ public class SlowFold
 	
 	public static enum PoolingMode{
 		
-		NONE((a, x, y, z, w, h, s) -> a[x + (y * w) + (z * s)]),
-		AVERAGE((a, x, y, z, w, h, s) ->
-			(
-				a[2 * x + (2 * y * w) + (z * s)]
-				+ a[2 * x + ((2 * y + 1) * w) + (z * s)]
-				+ a[(2 * x + 1) + (2 * y * w) + (z * s)]
-				+ a[(2 * x + 1) + ((2 * y + 1) * w) + (z * s)]
-			) / 4
-		),
-		MAXIMUM((a, x, y, z, w, h, s) ->
-			Math.max(
-				a[2 * x + (2 * y * w) + (z * s)],
-				Math.max(
-					a[2 * x + ((2 * y + 1) * w) + (z * s)],
-					Math.max(
-						a[(2 * x + 1) + (2 * y * w) + (z * s)],
-						a[(2 * x + 1) + ((2 * y + 1) * w) + (z * s)]
-					)
-				)
-			)
-		);
+		NONE(SlowFoldPoolingModes::directOutputSum, SlowFoldPoolingModes::directOutputErrorSum),
+		AVERAGE(SlowFoldPoolingModes::averageOutputSum, SlowFoldPoolingModes::averageOutputErrorSum),
+		MAXIMUM(SlowFoldPoolingModes::maximumOutputSum, SlowFoldPoolingModes::maximumOutputErrorSum);
 		
 		
 		
-		private final PoolingCalculator calculator;
+		private final OutputSumCalculator outputSum;
+		private final ErrorSumCalculator errorSum;
 		
 		
-		private PoolingMode(PoolingCalculator calculator){
-			this.calculator = calculator;
-		}
-		
-		
-		public float getValue(float array[], int x, int y, int z, int width, int height, int size){
-			return this.calculator.calculate(array, x, y, z, width, height, size);
+		private PoolingMode(OutputSumCalculator outputSum, ErrorSumCalculator errorSum){
+			this.outputSum = outputSum;
+			this.errorSum = errorSum;
 		}
 		
 		
 		
-		private interface PoolingCalculator{
+		private interface OutputSumCalculator{
 			
+			public float calculate(
+					float inputs[], float filter[],
+					int lowerBoundX, int upperBoundX, int lowerBoundY, int upperBoundY,
+					int x, int y, int width, int height, int size,
+					int filterWidth, int filterHeight, int filterSize, int filterDepth,
+					int filterWidthPadding, int filterHeightPadding);
+		}
+		
+		private interface ErrorSumCalculator{
 			
-			public float calculate(float array[], int x, int y, int z, int width, int height, int size);
+			public float calculate(
+					float inputs[], float errors[], int layerOffset,
+					int lowerBoundX, int upperBoundX, int lowerBoundY, int upperBoundY,
+					int offsetX, int offsetY, int offsetZ, int width, int height, int size);
 		}
 	}
 	
@@ -235,8 +226,6 @@ public class SlowFold
 			for(int j = 0; j < this.filters.length; j++){
 				for(int y = 0; y < this.height; y++){
 					for(int x = 0; x < this.width; x++){
-						float sum = 0;
-
 						int lowerBoundX = x - SlowFold.this.filterWidthPadding < 0 ? -(x - SlowFold.this.filterWidthPadding) : 0;
 						int upperBoundX = SlowFold.this.filterWidth + (
 							x + SlowFold.this.filterWidthPadding >= this.width
@@ -250,15 +239,13 @@ public class SlowFold
 							: 0
 						);
 						
-						for(int fY = lowerBoundY, rY = y + (fY - SlowFold.this.filterHeightPadding); fY < upperBoundY; fY++, rY++){
-							for(int fX = lowerBoundX, rX = x + (fX - SlowFold.this.filterWidthPadding); fX < upperBoundX; fX++, rX++){
-								for(int fZ = 0; fZ < this.filterDepth; fZ++){
-									sum +=
-										this.poolingMode.getValue(inputs, rX, rY, fZ, this.width, this.height, this.size)
-										* this.filters[j][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)];
-								}
-							}
-						}
+						float sum = this.poolingMode.outputSum.calculate(
+							inputs, this.filters[j],
+							lowerBoundX, upperBoundX, lowerBoundY, upperBoundY,
+							x, y, this.width, this.height, this.size,
+							SlowFold.this.filterWidth, SlowFold.this.filterHeight, SlowFold.this.filterSize, this.filterDepth,
+							SlowFold.this.filterWidthPadding, SlowFold.this.filterHeightPadding
+						);
 						
 						// map sum between filter minimum and maximum to an output between 0 and 1
 						float filterMin = this.filters[j][this.filters[j].length - 2];
@@ -316,7 +303,7 @@ public class SlowFold
 			}
 		}
 		
-		private void train(float previousOutputs[], int previousDepth){
+		private void train(float inputs[], int inputDepth){
 			for(int i = 0; i < this.filters.length; i++){
 				float filterMin = 0f, filterMax = 0f;
 				for(int fY = 0, rfY = -SlowFold.this.filterHeightPadding; fY < SlowFold.this.filterHeight; fY++, rfY++){
@@ -326,20 +313,18 @@ public class SlowFold
 						int lowerBoundY = Math.max(rfY, 0);
 						int upperBoundY = this.height + Math.min(rfY, 0);
 						
-						for(int fZ = 0; fZ < previousDepth; fZ++){
-							float outputErrorSum = 0f;
-							for(int y = lowerBoundY; y < upperBoundY; y++){
-								for(int x = lowerBoundX; x < upperBoundX; x++){
-									outputErrorSum +=
-										this.poolingMode.getValue(previousOutputs, x, y, fZ, this.width, this.height, this.size)
-										* this.errors[(x - rfX) + ((y - rfY) * this.width) + (i * this.size)];
-								}
-							}
-							
+						for(int fZ = 0; fZ < inputDepth; fZ++){
 							float weight = this.filters[i][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)] =
 								(float)(
 									this.filters[i][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)]
-									+ (SlowFold.this.fullyConnected.learningRate * outputErrorSum)
+									+ (
+										SlowFold.this.fullyConnected.learningRate
+										* this.poolingMode.errorSum.calculate(
+											inputs, this.errors, i * this.size,
+											lowerBoundX, upperBoundX, lowerBoundY, upperBoundY,
+											rfX, rfY, fZ, this.width, this.height, this.size
+										)
+									)
 								);
 							
 							if(weight < 0)
