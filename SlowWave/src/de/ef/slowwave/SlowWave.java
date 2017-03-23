@@ -147,6 +147,13 @@ public class SlowWave
 					* (1 - this.layers[i][j].getOutput())
 					* lastError
 				);
+			}
+		}
+		
+		// adjust weights of each neuron after error is calculated
+		// the order does not matter
+		for(int i = 1; i < this.layers.length; i++){
+			for(int j = 0; j < this.layers[i].length; j++){
 				// adjust weights for current neuron
 				for(int k = 0; k < this.layers[i - 1].length; k++){
 					this.layers[i][j].setWeight(k,

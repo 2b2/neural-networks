@@ -110,7 +110,8 @@ public class SlowFold
 		// train fully connected layers with filter forward pass
 		double totalError = this.fullyConnected.train(filterForward, outputs);
 		
-		// train filters // TODO handle pooling after last layer
+		// TODO handle pooling after last layer
+		// calculate errors
 		for(int i = this.filterLayers.length - 1; i >= 0; i--){
 			float filters[][] = this.filterLayers[i].filters;
 			
@@ -140,11 +141,16 @@ public class SlowFold
 					this.filterLayers[i + 1].width, this.filterLayers[i + 1].height
 				);
 			}
+		}
+		
+		// adjust weights after error calculation, the order is not important
+		float previousOutputs[] = inputs;
+		int previousDepth = this.inputDepth;
+		for(int i = 0; i < this.filterLayers.length; i++){
+			this.filterLayers[i].train(previousOutputs, previousDepth);
 			
-			if(i == 0)
-				this.filterLayers[0].train(inputs, this.inputDepth);
-			else
-				this.filterLayers[i].train(this.filterLayers[i - 1].outputs, this.filterLayers[i - 1].filters.length);
+			previousOutputs = this.filterLayers[i].outputs;
+			previousDepth = this.filterLayers[i].filters.length;
 		}
 		
 		// use total error of fully connected layers as total error of this neural-network
