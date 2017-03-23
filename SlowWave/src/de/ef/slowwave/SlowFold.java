@@ -269,7 +269,7 @@ public class SlowFold
 		
 		private void calculateErrors(float nextErrors[], float nextFilters[][], final int nextWidth, final int nextHeight){
 			final int nextSize = nextWidth * nextHeight;
-			final boolean nextScaled = this.size != nextWidth;
+			final boolean nextScaled = this.size != nextSize;
 			
 			for(int i = 0, index = 0; i < this.filters.length; i++){
 				for(int y = 0; y < this.height; y++){
@@ -298,7 +298,7 @@ public class SlowFold
 											? nextErrors[(rX / 2) + ((rY / 2) * nextWidth) + (j * nextSize)]
 											: nextErrors[rX + (rY * nextWidth) + (j * nextSize)]
 										)
-										* nextFilters[j][fX + (fY * SlowFold.this.filterWidth) + (j * SlowFold.this.filterSize)];
+										* nextFilters[j][fX + (fY * SlowFold.this.filterWidth) + (i * SlowFold.this.filterSize)];
 								}
 							}
 						}
