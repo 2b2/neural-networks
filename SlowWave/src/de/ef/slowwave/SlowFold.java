@@ -44,20 +44,11 @@ public class SlowFold
 		for(int i = 0; i < this.filterLayers.length; previousDepth = this.filterLayers[i++].filters.length){
 			float filters[][] = new float[(int)properties.get("filters.layers." + i)][];
 			for(int j = 0; j < filters.length; j++){
-				filters[j] = new float[this.filterSize * previousDepth + 2];
+				filters[j] = new float[this.filterSize * previousDepth];
 				
-				float filterMin = 0f, filterMax = 0f;
 				for(int k = 0; k + 2 < filters[j].length; k++){
-					float weight = (filters[j][k] = (float)(1 - (Math.random() * 2)));
-					if(weight < 0)
-						filterMin += weight;
-					else
-						filterMax += weight;
+					filters[j][k] = (float)(1 - (Math.random() * 2));
 				}
-				
-				// set minimal and maximal output of filter (assuming an an input between 0 and 1)
-				filters[j][filters[j].length - 2] = filterMin;
-				filters[j][filters[j].length - 1] = filterMax;
 			}
 			
 			Object poolingModeObject =
@@ -253,12 +244,9 @@ public class SlowFold
 							SlowFold.this.filterWidthPadding, SlowFold.this.filterHeightPadding
 						);
 						
-						// map sum between filter minimum and maximum to an output between 0 and 1
-						float filterMin = this.filters[j][this.filters[j].length - 2];
-						float filterMax = this.filters[j][this.filters[j].length - 1];
-						
+						// use activation function on sum (logistic-function)
 						this.outputs[x + (y * this.width) + (j * this.size)] =
-							((sum - filterMin) / (filterMax - filterMin));
+							(float)(1 / (1 + Math.pow(Math.E, -sum)));
 					}
 				}
 			}
@@ -311,7 +299,6 @@ public class SlowFold
 		
 		private void train(float inputs[], int inputDepth){
 			for(int i = 0; i < this.filters.length; i++){
-				float filterMin = 0f, filterMax = 0f;
 				for(int fY = 0, rfY = -SlowFold.this.filterHeightPadding; fY < SlowFold.this.filterHeight; fY++, rfY++){
 					for(int fX = 0, rfX = -SlowFold.this.filterWidthPadding; fX < SlowFold.this.filterWidth; fX++, rfX++){
 						int lowerBoundX = Math.max(rfX, 0);
@@ -320,30 +307,22 @@ public class SlowFold
 						int upperBoundY = this.height + Math.min(rfY, 0);
 						
 						for(int fZ = 0; fZ < inputDepth; fZ++){
-							float weight = this.filters[i][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)] =
-								(float)(
-									this.filters[i][fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize)]
-									+ (
-										SlowFold.this.fullyConnected.learningRate
-										* this.poolingMode.errorSum.calculate(
-											inputs, this.errors, i * this.size,
-											lowerBoundX, upperBoundX, lowerBoundY, upperBoundY,
-											rfX, rfY, fZ, this.width, this.height, this.size
-										)
-									)
-								);
+							int index = fX + (fY * SlowFold.this.filterWidth) + (fZ * SlowFold.this.filterSize);
 							
-							if(weight < 0)
-								filterMin += weight;
-							else
-								filterMax += weight;
+							this.filters[i][index] = (float)(
+								this.filters[i][index]
+								+ (
+									SlowFold.this.fullyConnected.learningRate
+									* this.poolingMode.errorSum.calculate(
+										inputs, this.errors, i * this.size,
+										lowerBoundX, upperBoundX, lowerBoundY, upperBoundY,
+										rfX, rfY, fZ, this.width, this.height, this.size
+									)
+								)
+							);
 						}
 					}
 				}
-				
-				// update filter minimum and maximum
-				this.filters[i][this.filters[i].length - 2] = filterMin;
-				this.filters[i][this.filters[i].length - 1] = filterMax;
 			}
 		}
 	}
